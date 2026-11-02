@@ -2,10 +2,10 @@
 -- Uses Canary MonsterType registration style. Placeholder outfit lookType=128.
 -- Boss phase mechanics are specified in JSON and will be wired after the event API is tested in DEV.
 
-local mType = Game.createMonsterType("Carroñero de Escoria")
+local mType = Game.createMonsterType(Nocthold.latin1("Carroñero de Escoria"))
 local monster = {}
 
-monster.description = "Carroñero de Escoria"
+monster.description = Nocthold.latin1("Carroñero de Escoria")
 monster.experience = 0
 monster.outfit = {
     lookType = 128,

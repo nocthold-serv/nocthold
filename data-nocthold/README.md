@@ -37,7 +37,7 @@ los datapacks tienen sus propias migraciones.
 
 GitHub Actions ya lo comprueba en cada PR que toca el servidor (paso
 "Datapack propio" del workflow *Servidor*): arranca con este datapack y exige
-ver `[NOCTHOLD] OK Contenido propio 0.2.0 cargado: 7/7 monstruos, 5/5 NPC.` sin errores en
+ver `[NOCTHOLD] OK Contenido propio 0.2.1 cargado: 7/7 monstruos, 5/5 NPC.` sin errores en
 nuestros archivos.
 
 ## Pendiente (siguiente trabajo)
@@ -47,4 +47,4 @@ nuestros archivos.
 - Elegir aspectos (lookType) e IDs de objetos a partir de los assets del cliente 15.25.
 - Mapa propio `.otbm` en RME y colocar los NPC.
 - Mazmorras Mythic+ (instancias, llaves, temporizador, recompensas).
-- Revisar en el cliente cómo se ven los acentos y la ñ en nombres y diálogos.
+- Acentos y ñ: los textos para el jugador pasan por `Nocthold.latin1()` (el cliente lee Latin-1). Úsalo en todo texto nuevo con tildes.
