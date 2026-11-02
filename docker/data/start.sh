@@ -16,6 +16,7 @@ CANARY_STATUS_TIMEOUT="${CANARY_STATUS_TIMEOUT:-5000}"
 CANARY_TEST_ACCOUNTS="${CANARY_TEST_ACCOUNTS:-false}"
 CANARY_DATA_PACK="${CANARY_DATA_PACK:-data-otservbr-global}"
 CANARY_MAP_URL="${CANARY_MAP_URL:-https://github.com/opentibiabr/canary/releases/download/v3.6.1/otservbr.otbm}"
+CANARY_MAP_NAME="${CANARY_MAP_NAME:-otservbr}"
 
 validate_identifier() {
 	local name="$1"
@@ -95,6 +96,8 @@ mysqldump_cmd() {
 }
 
 validate_identifier "CANARY_DB_NAME" "$CANARY_DB_NAME"
+validate_identifier "CANARY_DATA_PACK" "$CANARY_DATA_PACK"
+validate_identifier "CANARY_MAP_NAME" "$CANARY_MAP_NAME"
 require_uint "CANARY_DB_PORT" "$CANARY_DB_PORT"
 require_uint "CANARY_LOGIN_PORT" "$CANARY_LOGIN_PORT"
 require_uint "CANARY_GAME_PORT" "$CANARY_GAME_PORT"
@@ -122,6 +125,7 @@ echo "CANARY_STATUS_TIMEOUT:[$CANARY_STATUS_TIMEOUT]"
 echo "CANARY_TEST_ACCOUNTS:[$CANARY_TEST_ACCOUNTS]"
 echo "CANARY_DATA_PACK:[$CANARY_DATA_PACK]"
 echo "CANARY_MAP_URL:[$CANARY_MAP_URL]"
+echo "CANARY_MAP_NAME:[$CANARY_MAP_NAME]"
 echo ""
 echo "======================================="
 echo ""
@@ -249,6 +253,12 @@ set_lua_number "statusProtocolPort" "$CANARY_STATUS_PORT"
 set_lua_number "statusTimeout" "$CANARY_STATUS_TIMEOUT"
 set_lua_string "dataPackDirectory" "$CANARY_DATA_PACK"
 set_lua_string "mapDownloadUrl" "$CANARY_MAP_URL"
+set_lua_string "mapName" "$CANARY_MAP_NAME"
+# Canary solo acepta data-canary y data-otservbr-global salvo que se permita otro nombre
+# (por ejemplo data-nocthold).
+if [ "$CANARY_DATA_PACK" != "data-canary" ] && [ "$CANARY_DATA_PACK" != "data-otservbr-global" ]; then
+	set_lua_line "useAnyDatapackFolder" "useAnyDatapackFolder = true"
+fi
 
 echo "config.lua updated"
 

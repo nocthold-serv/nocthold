@@ -115,6 +115,10 @@ COPY LICENSE *.sql key.pem /canary/
 COPY data /canary/data
 COPY data-canary /canary/data-canary
 COPY data-otservbr-global /canary/data-otservbr-global
+# Datapack propio (data-nocthold): copia de data-canary con nuestros archivos encima.
+# Solo se usa si CANARY_DATA_PACK=data-nocthold; producción sigue con data-otservbr-global.
+COPY data-canary /canary/data-nocthold
+COPY data-nocthold /canary/data-nocthold
 COPY config.lua.dist /canary/config.lua
 
 WORKDIR /canary

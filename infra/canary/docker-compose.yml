@@ -56,7 +56,10 @@ services:
       CANARY_STATUS_PORT: "${STATUS_PORT:?falta STATUS_PORT en el .env}"
       CANARY_STATUS_TIMEOUT: "5000"
       CANARY_TEST_ACCOUNTS: "false"
-      CANARY_DATA_PACK: data-otservbr-global
+      # Datapack y mapa: por defecto el mundo global. data-nocthold + canary es el
+      # datapack propio en pruebas (no usarlo con la base de datos de producción).
+      CANARY_DATA_PACK: "${DATA_PACK:-data-otservbr-global}"
+      CANARY_MAP_NAME: "${MAP_NAME:-otservbr}"
       CANARY_MAP_URL: "${MAP_URL}"
       OT_DB_HOST: db
       OT_DB_PORT: "3306"
@@ -68,7 +71,7 @@ services:
       OT_SERVER_GAME_PORT: "${GAME_PORT}"
       OT_SERVER_STATUS_PORT: "${STATUS_PORT}"
       OT_SERVER_TEST_ACCOUNTS: "false"
-      OT_SERVER_DATA: data-otservbr-global
+      OT_SERVER_DATA: "${DATA_PACK:-data-otservbr-global}"
       OT_SERVER_MAP: "${MAP_URL}"
     ports:
       - "${LOGIN_PORT}:${LOGIN_PORT}"
