@@ -18,9 +18,9 @@ El workflow compila OTClient para Windows en GitHub Actions y saca dos `.zip`:
 - **Nocthold-Windows.zip**: producción, login en `http://158.220.91.85:8088/login`.
 - **Nocthold-Pruebas-Windows.zip**: instancia de pruebas, login en `http://158.220.91.85:8188/login` (solo testers).
 
-Los dos usan el protocolo 15.11 (Canary 3.6.x).
+Los dos usan el protocolo 15.25, que es el que acepta la imagen de Canary del VPS (su log lo dice al arrancar: "Allowed client protocols: 15.25..."). Si cambiamos de imagen, hay que revisar `PROTOCOLO` en `configurar.py`.
 
-**Gráficos del juego.** El `.zip` no lleva los gráficos (sprites, appearances): los descarga el propio cliente la primera vez que el jugador pulsa Login, desde [dudantas/tibia-client](https://github.com/dudantas/tibia-client) (etiqueta 15.11, comprobando el SHA-256 de cada fichero). Así nuestro repo no aloja ficheros de Tibia. Cuando tengamos gráficos propios (fase 14) se cambia en `init.lua` (`Services.clientAssets`).
+**Gráficos del juego.** El `.zip` no lleva los gráficos (sprites, appearances): los descarga el propio cliente la primera vez que el jugador pulsa Login, desde [dudantas/tibia-client](https://github.com/dudantas/tibia-client) (la etiqueta de la versión 15.25, comprobando el SHA-256 de cada fichero). Así nuestro repo no aloja ficheros de Tibia. Cuando tengamos gráficos propios (fase 14) se cambia en `init.lua` (`Services.clientAssets`).
 
 ## Sacar una versión para los jugadores
 

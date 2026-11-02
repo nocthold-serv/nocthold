@@ -23,7 +23,7 @@ from pathlib import Path
 
 # Datos públicos de cada instancia (ver infra/canary/instancia.env.example).
 SERVIDOR_IP = "158.220.91.85"
-PROTOCOLO = 1511  # Canary 3.6.x = cliente 15.11
+PROTOCOLO = 1525  # La imagen de Canary que usamos acepta 15.25 (ver "Allowed client protocols" en su log)
 
 CANALES = {
     "prod": {"nombre": "Nocthold", "corto": "nocthold", "puerto_http": 8088},
