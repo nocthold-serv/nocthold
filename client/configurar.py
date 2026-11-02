@@ -13,6 +13,10 @@ Cambia:
     cargar los gráficos nada más arrancar; si aún no se han descargado sale
     un error de "Tibia.dat". Solo los precargamos si ya están instalados (si
     no, se descargan al pulsar Login).
+  * init.lua (Services.clientAssets): los gráficos se guardan en la carpeta de
+    usuario de Windows (%APPDATA%\\nocthold\\...) y no dentro de la del cliente,
+    así un .zip nuevo no obliga a descargarlos otra vez. Y no se bajan los
+    "extras" del cliente oficial (carpeta bin), que OTClient no necesita.
   * Quita mods/game_bot: OTClient trae un bot (cavebot, targetbot) que no
     queremos repartir a los jugadores.
 
@@ -88,6 +92,15 @@ def main() -> None:
         "end"
     )
     texto = sustituir(texto, r"    Servers_init = \{\n.*?\n    \}\nend", servidores, "Servers_init")
+    texto = sustituir(
+        texto, r"installArchiveExtras = true,", "installArchiveExtras = false,", "installArchiveExtras"
+    )
+    texto = sustituir(
+        texto,
+        r"installPackagedFiles = true\n",
+        "installPackagedFiles = false,\n        installInWorkDir = false\n",
+        "installPackagedFiles",
+    )
     texto = sustituir(texto, r'g_app\.setName\("[^"]*"\)', f'g_app.setName("{canal["nombre"]}")', "setName")
     texto = sustituir(
         texto, r'g_app\.setCompactName\("[^"]*"\)', f'g_app.setCompactName("{canal["corto"]}")', "setCompactName"
