@@ -1,0 +1,30 @@
+-- Nocthold
+-- Removes paralysis and provides a small stabilizing heal to a friendly target.
+-- Additional dispel types will be configured after the first in-game tests.
+
+local combat = Combat()
+combat:setParameter(COMBAT_PARAM_TYPE, COMBAT_HEALING)
+combat:setParameter(COMBAT_PARAM_EFFECT, CONST_ME_HOLYDAMAGE)
+combat:setParameter(COMBAT_PARAM_AGGRESSIVE, false)
+combat:setParameter(COMBAT_PARAM_DISPEL, CONDITION_PARALYZE)
+combat:setFormula(COMBAT_FORMULA_LEVELMAGIC, 0.10, 4, 0.15, 8)
+
+local spell = Spell("instant")
+spell:name("Purify")
+spell:words("nocthold purify")
+spell:group("healing")
+spell:cooldown(16000)
+spell:groupCooldown(1000)
+spell:level(6)
+spell:mana(25)
+spell:needTarget(true)
+spell:range(5)
+spell:allowOnSelf(true)
+spell:isAggressive(false)
+spell:needLearn(false)
+spell:vocation("druid;true", "elder druid;true")
+spell:onCastSpell(function(creature, variant)
+    return combat:execute(creature, variant)
+end)
+spell:register()
+Nocthold.registerSpell("Purify")

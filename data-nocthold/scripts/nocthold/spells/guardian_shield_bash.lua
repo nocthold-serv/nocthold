@@ -1,0 +1,30 @@
+-- Nocthold
+-- Canary 3.6.1 Revscriptsys spell. Temporary class mapping: Knight / Elite Knight.
+-- Damage and target validation are performed by Canary's Combat system.
+
+local combat = Combat()
+combat:setParameter(COMBAT_PARAM_TYPE, COMBAT_PHYSICALDAMAGE)
+combat:setParameter(COMBAT_PARAM_EFFECT, CONST_ME_HITAREA)
+combat:setParameter(COMBAT_PARAM_BLOCKARMOR, true)
+combat:setParameter(COMBAT_PARAM_BLOCKSHIELD, true)
+combat:setFormula(COMBAT_FORMULA_LEVELMAGIC, -0.55, -10, -0.85, -18)
+
+local spell = Spell("instant")
+spell:name("Shield Bash")
+spell:words("nocthold bash")
+spell:group("attack")
+spell:cooldown(5000)
+spell:groupCooldown(1000)
+spell:level(1)
+spell:mana(8)
+spell:needTarget(true)
+spell:range(1)
+spell:blockWalls(true)
+spell:isAggressive(true)
+spell:needLearn(false)
+spell:vocation("knight;true", "elite knight;true")
+spell:onCastSpell(function(creature, variant)
+    return combat:execute(creature, variant)
+end)
+spell:register()
+Nocthold.registerSpell("Shield Bash")

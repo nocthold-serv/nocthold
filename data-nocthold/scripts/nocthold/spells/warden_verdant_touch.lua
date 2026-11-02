@@ -1,0 +1,28 @@
+-- Nocthold
+-- Direct single-target healing. Temporary class mapping: Druid / Elder Druid.
+
+local combat = Combat()
+combat:setParameter(COMBAT_PARAM_TYPE, COMBAT_HEALING)
+combat:setParameter(COMBAT_PARAM_EFFECT, CONST_ME_MAGIC_GREEN)
+combat:setParameter(COMBAT_PARAM_AGGRESSIVE, false)
+combat:setFormula(COMBAT_FORMULA_LEVELMAGIC, 0.70, 10, 0.95, 18)
+
+local spell = Spell("instant")
+spell:name("Verdant Touch")
+spell:words("nocthold mend")
+spell:group("healing")
+spell:cooldown(4000)
+spell:groupCooldown(1000)
+spell:level(1)
+spell:mana(20)
+spell:needTarget(true)
+spell:range(5)
+spell:allowOnSelf(true)
+spell:isAggressive(false)
+spell:needLearn(false)
+spell:vocation("druid;true", "elder druid;true")
+spell:onCastSpell(function(creature, variant)
+    return combat:execute(creature, variant)
+end)
+spell:register()
+Nocthold.registerSpell("Verdant Touch")

@@ -2,7 +2,7 @@
 -- Sirve para que el aviso de arranque y /nocthold status digan qué se ha cargado de verdad.
 
 Nocthold = Nocthold or {}
-Nocthold.version = "0.2.1"
+Nocthold.version = "1.0.0-alpha.1"
 
 -- Los siete monstruos de monster/nocthold/ (nombre exacto de Game.createMonsterType).
 Nocthold.monsters = {
@@ -33,6 +33,14 @@ function Nocthold.registerNpc(name)
 	table.insert(Nocthold.npcs, name)
 end
 
+-- Los 30 hechizos de scripts/nocthold/spells/. Cada uno se apunta al registrarse.
+Nocthold.expectedSpells = 30
+Nocthold.spells = {}
+
+function Nocthold.registerSpell(name)
+	table.insert(Nocthold.spells, name)
+end
+
 function Nocthold.countMonsters()
 	local loaded = 0
 	local missing = {}
@@ -49,11 +57,13 @@ end
 function Nocthold.statusText()
 	local monsters = Nocthold.countMonsters()
 	return string.format(
-		"Contenido propio %s cargado: %d/%d monstruos, %d/%d NPC.",
+		"Contenido propio %s cargado: %d/%d monstruos, %d/%d NPC, %d/%d hechizos.",
 		Nocthold.version,
 		monsters,
 		#Nocthold.monsters,
 		#Nocthold.npcs,
-		Nocthold.expectedNpcs
+		Nocthold.expectedNpcs,
+		#Nocthold.spells,
+		Nocthold.expectedSpells
 	)
 end

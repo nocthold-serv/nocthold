@@ -42,7 +42,9 @@ monster.flags = {
     canWalkOnPoison = true,
 }
 monster.voices = { interval = 7000, chance = 10 }
-monster.loot = {}
+monster.loot = {
+    { name = "gold coin", chance = 70000, maxCount = 25 },
+}
 monster.attacks = {
     { name = "melee", type = COMBAT_PHYSICALDAMAGE, interval = 2000, minDamage = -40, maxDamage = -65 },
     { name = "combat", type = COMBAT_FIREDAMAGE, interval = 5000, chance = 20, radius = 2, minDamage = -25, maxDamage = -40, target = false },
@@ -50,4 +52,5 @@ monster.attacks = {
 monster.defenses = { defense = 10, armor = 10 }
 monster.immunities = {}
 
+mType:registerEvent("NoctholdDungeonDeath")
 mType:register(monster)

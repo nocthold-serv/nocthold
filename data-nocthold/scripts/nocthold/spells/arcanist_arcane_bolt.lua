@@ -1,0 +1,27 @@
+-- Nocthold
+-- Single-target energy damage. Temporary class mapping: Sorcerer / Master Sorcerer.
+
+local combat = Combat()
+combat:setParameter(COMBAT_PARAM_TYPE, COMBAT_ENERGYDAMAGE)
+combat:setParameter(COMBAT_PARAM_EFFECT, CONST_ME_ENERGYHIT)
+combat:setFormula(COMBAT_FORMULA_LEVELMAGIC, -0.85, -12, -1.05, -20)
+
+local spell = Spell("instant")
+spell:name("Arcane Bolt")
+spell:words("nocthold bolt")
+spell:group("attack")
+spell:cooldown(2500)
+spell:groupCooldown(1000)
+spell:level(1)
+spell:mana(18)
+spell:needTarget(true)
+spell:range(6)
+spell:blockWalls(true)
+spell:isAggressive(true)
+spell:needLearn(false)
+spell:vocation("sorcerer;true", "master sorcerer;true")
+spell:onCastSpell(function(creature, variant)
+    return combat:execute(creature, variant)
+end)
+spell:register()
+Nocthold.registerSpell("Arcane Bolt")
