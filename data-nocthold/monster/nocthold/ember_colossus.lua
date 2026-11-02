@@ -1,4 +1,4 @@
--- UMBRAL prototype creature: Coloso de Brasa
+-- Nocthold prototype creature: Coloso de Brasa
 -- Uses Canary MonsterType registration style. Placeholder outfit lookType=131.
 -- Boss phase mechanics are specified in JSON and will be wired after the event API is tested in DEV.
 

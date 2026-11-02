@@ -1,14 +1,14 @@
--- UMBRAL prototype creature: Carroñero de Escoria
--- Uses Canary MonsterType registration style. Placeholder outfit lookType=128.
+-- Nocthold prototype creature: Sabueso de Ceniza
+-- Uses Canary MonsterType registration style. Placeholder outfit lookType=35.
 -- Boss phase mechanics are specified in JSON and will be wired after the event API is tested in DEV.
 
-local mType = Game.createMonsterType("Carroñero de Escoria")
+local mType = Game.createMonsterType("Sabueso de Ceniza")
 local monster = {}
 
-monster.description = "Carroñero de Escoria"
+monster.description = "Sabueso de Ceniza"
 monster.experience = 0
 monster.outfit = {
-    lookType = 128,
+    lookType = 35,
     lookHead = 0,
     lookBody = 0,
     lookLegs = 0,
@@ -16,10 +16,10 @@ monster.outfit = {
     lookAddons = 0,
     lookMount = 0,
 }
-monster.health = 1800
-monster.maxHealth = 1800
+monster.health = 2400
+monster.maxHealth = 2400
 monster.race = "blood"
-monster.speed = 175
+monster.speed = 230
 monster.manaCost = 0
 monster.changeTarget = { interval = 4000, chance = 10 }
 monster.flags = {
@@ -44,9 +44,10 @@ monster.flags = {
 monster.voices = { interval = 7000, chance = 10 }
 monster.loot = {}
 monster.attacks = {
-    { name = "melee", type = COMBAT_PHYSICALDAMAGE, interval = 2000, minDamage = -35, maxDamage = -55 },
+    { name = "melee", type = COMBAT_PHYSICALDAMAGE, interval = 2000, minDamage = -40, maxDamage = -65 },
+    { name = "combat", type = COMBAT_FIREDAMAGE, interval = 5000, chance = 20, radius = 2, minDamage = -25, maxDamage = -40, target = false },
 }
-monster.defenses = { defense = 12, armor = 8 }
+monster.defenses = { defense = 10, armor = 10 }
 monster.immunities = {}
 
 mType:register(monster)

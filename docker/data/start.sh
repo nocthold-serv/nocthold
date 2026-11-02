@@ -255,7 +255,7 @@ set_lua_string "dataPackDirectory" "$CANARY_DATA_PACK"
 set_lua_string "mapDownloadUrl" "$CANARY_MAP_URL"
 set_lua_string "mapName" "$CANARY_MAP_NAME"
 # Canary solo acepta data-canary y data-otservbr-global salvo que se permita otro nombre
-# (por ejemplo data-umbral).
+# (por ejemplo data-nocthold).
 if [ "$CANARY_DATA_PACK" != "data-canary" ] && [ "$CANARY_DATA_PACK" != "data-otservbr-global" ]; then
 	set_lua_line "useAnyDatapackFolder" "useAnyDatapackFolder = true"
 fi

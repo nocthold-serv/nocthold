@@ -1,8 +1,8 @@
--- UMBRAL NPC prototypes for Canary Revscripts/NpcType API.
+-- Nocthold NPC prototypes for Canary Revscripts/NpcType API.
 -- All five are registered as NPC types. A map NPC placement file is still required to spawn them.
--- Nocthold: cada NPC se apunta en Umbral.npcs (scripts/lib/umbral.lua) para el aviso de arranque.
+-- Nocthold: cada NPC se apunta en Nocthold.npcs (scripts/lib/nocthold.lua) para el aviso de arranque.
 
-local function registerUmbralNpc(def)
+local function registerNoctholdNpc(def)
     local npcType = Game.createNpcType(def.name)
     local npcConfig = {
         name = def.name,
@@ -64,12 +64,12 @@ local function registerUmbralNpc(def)
     npcHandler:setMessage(MESSAGE_WALKAWAY, "Vuelve cuando estés preparado.")
     npcHandler:addModule(FocusModule:new(), npcConfig.name, true, true, true)
     npcType:register(npcConfig)
-    if Umbral then
-        Umbral.registerNpc(def.name)
+    if Nocthold then
+        Nocthold.registerNpc(def.name)
     end
 end
 
-registerUmbralNpc({
+registerNoctholdNpc({
     name = "Capitana Elira",
     voice = "¡Bastión del Alba necesita aventureros!",
     greeting = "Puedo hablarte de los contratos, la Forja Caída o las temporadas.",
@@ -81,7 +81,7 @@ registerUmbralNpc({
     fallback = "Pregúntame por contrato, forja o temporada.",
 })
 
-registerUmbralNpc({
+registerNoctholdNpc({
     name = "Intendente Renn",
     voice = "Equipo revisado, correas tensadas. Siguiente.",
     greeting = "Gestiono suministros y equipo básico.",
@@ -93,7 +93,7 @@ registerUmbralNpc({
     fallback = "Puedo explicarte equipo, marcas o reparación.",
 })
 
-registerUmbralNpc({
+registerNoctholdNpc({
     name = "Archivista Nima",
     voice = "Cada run deja una historia. Algunas, una cicatriz.",
     greeting = "Custodio los registros de Eryndor.",
@@ -105,7 +105,7 @@ registerUmbralNpc({
     fallback = "Pregúntame por historia, temporada o sintonía.",
 })
 
-registerUmbralNpc({
+registerNoctholdNpc({
     name = "Forjador Borun",
     voice = "El metal recuerda cada golpe.",
     greeting = "Puedo explicarte cómo se desarrollará la forja de equipo.",
@@ -117,7 +117,7 @@ registerUmbralNpc({
     fallback = "Pregúntame por mejorar, desguazar o legendario.",
 })
 
-registerUmbralNpc({
+registerNoctholdNpc({
     name = "Cronista de Llaves",
     voice = "Cinco nombres. Una llave. Una historia.",
     greeting = "Registro las expediciones de cinco aventureros.",
