@@ -9,6 +9,8 @@
 #   ./nocthold.sh prod backup    copia de la base de datos en ~/copias/prod
 #   ./nocthold.sh prod probar-copia   restaura la última copia aparte y la comprueba
 #   ./nocthold.sh prod stop      para la instancia (no borra nada)
+#   ./nocthold.sh prod cuenta <correo> "<Personaje>" [vocación]
+#                                crea una cuenta de jugador con un personaje
 #   ./nocthold.sh prod <otro>    cualquier orden de "docker compose"
 #
 # La primera vez crea prod.env / test.env con contraseñas aleatorias.
@@ -26,7 +28,7 @@ case "$instancia" in
 		nombre="Nocthold Pruebas"; login=7271; juego=7272; estado=7273; http=8188; web=8180
 		bd=nocthold_test; gm="GM Pruebas" ;;
 	*)
-		sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
+		sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
 		exit 1 ;;
 esac
 [ -n "$orden" ] || { echo "Falta la orden. Ejemplo: ./nocthold.sh $instancia up"; exit 1; }
@@ -95,6 +97,54 @@ case "$orden" in
 			        (SELECT COUNT(*) FROM accounts) AS cuentas,
 			        (SELECT COUNT(*) FROM players) AS personajes;"
 		echo "Restauración correcta." ;;
+	cuenta)
+		# Mientras no haya registro público (#26) las cuentas se crean aquí.
+		correo="${1:-}"; personaje="${2:-}"; vocacion="${3:-knight}"
+		if [[ ! "$correo" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] ||
+			[[ ! "$personaje" =~ ^[A-Z][a-z]+( [A-Z]?[a-z]+){0,2}$ ]] || [ ${#personaje} -gt 25 ]; then
+			echo "Uso: ./nocthold.sh $instancia cuenta <correo> \"<Personaje>\" [knight|paladin|sorcerer|druid|monk]"
+			echo "Personaje: solo letras, empieza por mayúscula, hasta 3 palabras y 25 caracteres."
+			exit 1
+		fi
+		case "$vocacion" in
+			knight) muestra="Knight Sample" ;; paladin) muestra="Paladin Sample" ;;
+			sorcerer) muestra="Sorcerer Sample" ;; druid) muestra="Druid Sample" ;;
+			monk) muestra="Monk Sample" ;;
+			*) echo "Vocación desconocida: $vocacion"; exit 1 ;;
+		esac
+		DB_NAME="$(leer DB_NAME)"
+		DB_ROOT_PASSWORD="$(leer DB_ROOT_PASSWORD)"
+		sql() {
+			"${compose[@]}" exec -T -e MYSQL_PWD="$DB_ROOT_PASSWORD" db \
+				mariadb -u root -N -B "$DB_NAME" -e "$1"
+		}
+		[ "$(sql "SELECT COUNT(*) FROM accounts WHERE email = '$correo'")" = 0 ] ||
+			{ echo "Ya hay una cuenta con el correo $correo."; exit 1; }
+		[ "$(sql "SELECT COUNT(*) FROM players WHERE name = '$personaje'")" = 0 ] ||
+			{ echo "Ya existe un personaje llamado $personaje."; exit 1; }
+		[ "$(sql "SELECT COUNT(*) FROM players WHERE name = '$muestra'")" = 1 ] ||
+			{ echo "No encuentro el personaje de muestra '$muestra' en la base de datos."; exit 1; }
+		clave="$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | cut -c1-14)"
+		# Si algo falla, mariadb corta y la transacción sin COMMIT se deshace.
+		sql "START TRANSACTION;
+			INSERT INTO accounts (name, email, password, type, creation)
+				VALUES ('j$(openssl rand -hex 6)', '$correo', SHA1('$clave'), 1, UNIX_TIMESTAMP());
+			SET @cuenta = LAST_INSERT_ID();
+			INSERT INTO players (name, group_id, account_id, level, vocation, health, healthmax, experience,
+				lookbody, lookfeet, lookhead, looklegs, looktype, maglevel, mana, manamax, manaspent,
+				town_id, conditions, cap, sex, skill_club, skill_club_tries, skill_sword, skill_sword_tries,
+				skill_axe, skill_axe_tries, skill_dist, skill_dist_tries)
+			SELECT '$personaje', 1, @cuenta, level, vocation, health, healthmax, experience,
+				lookbody, lookfeet, lookhead, looklegs, looktype, maglevel, mana, manamax, manaspent,
+				town_id, '', cap, sex, skill_club, skill_club_tries, skill_sword, skill_sword_tries,
+				skill_axe, skill_axe_tries, skill_dist, skill_dist_tries
+			FROM players WHERE name = '$muestra';
+			COMMIT;"
+		echo "Cuenta creada en $nombre."
+		echo "  Correo:     $correo"
+		echo "  Contraseña: $clave"
+		echo "  Personaje:  $personaje ($vocacion)"
+		echo "Pásale estos datos al jugador por privado; aquí no se guardan." ;;
 	down)
 		# Sin -v: nunca borra la base de datos. Para borrarla hay que hacerlo a mano.
 		"${compose[@]}" down "$@" ;;

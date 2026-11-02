@@ -97,7 +97,15 @@ ssh -L 8080:localhost:8080 -L 8180:localhost:8180 nocthold@158.220.91.85
 Luego en el navegador: <http://localhost:8080> (producción) o
 <http://localhost:8180> (pruebas). La cuenta de administrador es `admin` (o el
 correo `team.nocthold@gmail.com`) con la `MYAAC_ADMIN_PASSWORD` del `.env`.
-Desde ahí se crean las cuentas de los testers.
+Desde ahí también se pueden crear cuentas, pero lo más rápido es la orden
+`cuenta` (crea cuenta y personaje y te enseña la contraseña generada):
+
+```bash
+./nocthold.sh prod cuenta correo@ejemplo.com "Nombre Personaje" knight
+```
+
+Vocaciones: `knight` (por defecto), `paladin`, `sorcerer`, `druid` y `monk`.
+El jugador entra con el cliente de [`client/`](../../client/README.md).
 
 ## Órdenes del día a día
 
