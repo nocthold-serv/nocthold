@@ -1,0 +1,10 @@
+# Claves SSH públicas del equipo Nocthold (una por persona, una por línea).
+# Las líneas que empiezan por # se ignoran.
+# Para añadir una clave nueva: pégala en una línea nueva y vuelve a ejecutar
+#   sudo bash bootstrap.sh
+# en el VPS. El script no borra claves que ya estén instaladas.
+
+# georggsg
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICHC44nXjRWUusWOVCHvCVXirMwn8gugMW6BgP/TtfsW georggsg
+
+# compañero (PENDIENTE: pegar aquí su clave pública, empieza por ssh-ed25519)
