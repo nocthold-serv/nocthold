@@ -95,17 +95,6 @@ jobs:
         run: |
           $exe = Get-ChildItem otclient/build/windows-release/bin -Filter *.exe | Select-Object -First 1
           if (-not $exe) { throw "No se ha generado el .exe" }
-          # Que no se abra la consola de registros al lanzar el cliente: se marca
-          # el .exe como aplicación de ventana (subsistema 2 = Windows GUI) en
-          # su cabecera PE. El preset de OTClient lo deja como consola (3) según
-          # el tipo de compilación, así que no nos fiamos y lo fijamos aquí.
-          $bytes = [IO.File]::ReadAllBytes($exe.FullName)
-          $pe = [BitConverter]::ToInt32($bytes, 0x3C)
-          if ([Text.Encoding]::ASCII.GetString($bytes, $pe, 4) -ne "PE`0`0") { throw "El .exe no tiene cabecera PE" }
-          $sub = $pe + 0x5C
-          Write-Host "Subsistema del .exe: $([BitConverter]::ToUInt16($bytes, $sub)) (2 = ventana, 3 = consola)"
-          [BitConverter]::GetBytes([UInt16]2).CopyTo($bytes, $sub)
-          [IO.File]::WriteAllBytes($exe.FullName, $bytes)
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           $canales = @{ prod = "Nocthold"; test = "Nocthold-Pruebas" }
           foreach ($canal in $canales.Keys) {
