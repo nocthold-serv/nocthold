@@ -16,7 +16,7 @@ Puertos que quedan abiertos:
 
 Cualquier proveedor con **Ubuntu 24.04**, CPU **x86** (no ARM), al menos
 **8 GB de RAM** y centro de datos en Europa. Por ejemplo OVHcloud VPS-2/VPS-3 o
-Hetzner Cloud (4 vCPU / 8 GB o más).
+Contabo Cloud VPS (el que usamos: Cloud VPS 6, 12 GB).
 
 Cuando te pida una clave SSH, pega tu clave pública (la línea que empieza por
 `ssh-ed25519`). En OVH, si no te la pide, te mandará por correo un usuario
@@ -30,7 +30,7 @@ En PowerShell:
 
 ```powershell
 ssh ubuntu@IP_DEL_VPS     # OVH
-ssh root@IP_DEL_VPS       # Hetzner
+ssh root@IP_DEL_VPS       # Contabo, Hetzner
 ```
 
 La primera vez pregunta si te fías del servidor: escribe `yes`. Si te pide
