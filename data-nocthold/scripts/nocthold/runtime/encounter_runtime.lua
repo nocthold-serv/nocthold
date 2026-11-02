@@ -76,7 +76,8 @@ function U.buildMap(player)
                 end
                 if tile then
                     if not tile:getGround() then
-                        tile:addItem(floorId)
+                        -- Canary rechaza cualquier objeto en una casilla sin suelo; FLAG_NOLIMIT salta esa comprobacion
+                        tile:addItem(floorId, 1, FLAG_NOLIMIT)
                     end
                     if tile:getGround() then created = created + 1 else failed = failed + 1 end
                 else
