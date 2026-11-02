@@ -400,6 +400,7 @@ sftp-config.json
 
 # Binaries
 canary
+!/infra/canary/
 canary.old
 /backups/executables/
 

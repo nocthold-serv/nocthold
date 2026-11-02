@@ -1,0 +1,158 @@
+# Nocthold: una instancia completa de Canary (MariaDB + servidor + login + MyAAC).
+#
+# El mismo fichero sirve para producción y para pruebas. Lo que cambia
+# (puertos, nombre, contraseñas) va en prod.env o test.env, que no se suben a Git.
+# No lo lances a mano: usa ./nocthold.sh prod ... o ./nocthold.sh test ...
+#
+# Seguridad: Docker se salta ufw. Todo puerto que aparece en "ports" sin
+# 127.0.0.1 delante queda abierto a Internet. MariaDB (3306) no se publica nunca
+# y MyAAC solo escucha en 127.0.0.1 (se entra con un túnel SSH).
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+services:
+  db:
+    image: "mariadb:${MARIADB_VERSION:-11.4.13}"
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      MARIADB_DATABASE: "${DB_NAME:?falta DB_NAME en el .env}"
+      MARIADB_USER: "${DB_USER:?falta DB_USER en el .env}"
+      MARIADB_PASSWORD: "${DB_PASSWORD:?falta DB_PASSWORD en el .env}"
+      MARIADB_ROOT_PASSWORD: "${DB_ROOT_PASSWORD:?falta DB_ROOT_PASSWORD en el .env}"
+      TZ: "${TZ:-Europe/Madrid}"
+    volumes:
+      - db:/var/lib/mysql
+    networks:
+      - interna
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  server:
+    image: "${CANARY_IMAGE:?falta CANARY_IMAGE en el .env}"
+    restart: unless-stopped
+    logging: *logging
+    # Canary guarda a los jugadores al apagarse: le damos tiempo antes de matarlo.
+    stop_grace_period: 2m
+    environment:
+      TZ: "${TZ:-Europe/Madrid}"
+      # Variables que lee el start.sh de la imagen (nombres nuevos y antiguos).
+      CANARY_DB_HOST: db
+      CANARY_DB_PORT: "3306"
+      CANARY_DB_NAME: "${DB_NAME}"
+      CANARY_DB_USER: "${DB_USER}"
+      CANARY_DB_PASSWORD: "${DB_PASSWORD}"
+      CANARY_SERVER_NAME: "${SERVER_NAME:?falta SERVER_NAME en el .env}"
+      CANARY_SERVER_IP: "${SERVER_IP:?falta SERVER_IP en el .env}"
+      CANARY_LOGIN_PORT: "${LOGIN_PORT:?falta LOGIN_PORT en el .env}"
+      CANARY_GAME_PORT: "${GAME_PORT:?falta GAME_PORT en el .env}"
+      CANARY_STATUS_PORT: "${STATUS_PORT:?falta STATUS_PORT en el .env}"
+      CANARY_STATUS_TIMEOUT: "5000"
+      CANARY_TEST_ACCOUNTS: "false"
+      CANARY_DATA_PACK: data-otservbr-global
+      CANARY_MAP_URL: "${MAP_URL}"
+      OT_DB_HOST: db
+      OT_DB_PORT: "3306"
+      OT_DB_DATABASE: "${DB_NAME}"
+      OT_DB_USER: "${DB_USER}"
+      OT_DB_PASSWORD: "${DB_PASSWORD}"
+      OT_SERVER_IP: "${SERVER_IP}"
+      OT_SERVER_LOGIN_PORT: "${LOGIN_PORT}"
+      OT_SERVER_GAME_PORT: "${GAME_PORT}"
+      OT_SERVER_STATUS_PORT: "${STATUS_PORT}"
+      OT_SERVER_TEST_ACCOUNTS: "false"
+      OT_SERVER_DATA: data-otservbr-global
+      OT_SERVER_MAP: "${MAP_URL}"
+    ports:
+      - "${LOGIN_PORT}:${LOGIN_PORT}"
+      - "${GAME_PORT}:${GAME_PORT}"
+      - "${STATUS_PORT}:${STATUS_PORT}"
+    volumes:
+      # Aquí el arranque deja una copia de la BD (<nombre>.sql) cada vez que se inicia.
+      - server-data:/data
+    networks:
+      - interna
+    depends_on:
+      db:
+        condition: service_healthy
+
+  login:
+    image: "${LOGIN_SERVER_IMAGE:-opentibiabr/login-server:v1.1.3}"
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      LOGIN_HTTP_PORT: "${LOGIN_HTTP_PORT:?falta LOGIN_HTTP_PORT en el .env}"
+      LOGIN_GRPC_PORT: "9090"
+      MYSQL_HOST: db
+      MYSQL_PORT: "3306"
+      MYSQL_DBNAME: "${DB_NAME}"
+      MYSQL_USER: "${DB_USER}"
+      MYSQL_PASS: "${DB_PASSWORD}"
+      SERVER_NAME: "${SERVER_NAME}"
+      SERVER_IP: "${SERVER_IP}"
+      SERVER_PORT: "${GAME_PORT}"
+      SERVER_LOCATION: "${SERVER_LOCATION:-EUR}"
+      RATE_LIMITER_RATE: "2"
+      RATE_LIMITER_BURST: "5"
+    ports:
+      # El cliente pide aquí la lista de personajes: tiene que ser público.
+      - "${LOGIN_HTTP_PORT}:${LOGIN_HTTP_PORT}"
+    networks:
+      - interna
+    depends_on:
+      db:
+        condition: service_healthy
+
+  myaac:
+    build:
+      context: ../../docker
+      dockerfile: quickstart/myaac/Dockerfile
+      args:
+        MYAAC_REF: "${MYAAC_REF:-2.x}"
+    image: "nocthold-myaac:${MYAAC_REF:-2.x}"
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      CANARY_DB_HOST: db
+      CANARY_DB_PORT: "3306"
+      CANARY_DB_NAME: "${DB_NAME}"
+      CANARY_DB_USER: "${DB_USER}"
+      CANARY_DB_PASSWORD: "${DB_PASSWORD}"
+      CANARY_SERVER_NAME: "${SERVER_NAME}"
+      CANARY_SERVER_IP: "${SERVER_IP}"
+      CANARY_SERVER_LOCATION: "${SERVER_LOCATION:-EUR}"
+      CANARY_LOGIN_PORT: "${LOGIN_PORT}"
+      CANARY_GAME_PORT: "${GAME_PORT}"
+      CANARY_STATUS_PORT: "${STATUS_PORT}"
+      CANARY_DATA_PACK: data-otservbr-global
+      MYAAC_SITE_URL: "http://localhost:${MYAAC_PORT}"
+      MYAAC_ADMIN_ACCOUNT: "${MYAAC_ADMIN_ACCOUNT:?falta MYAAC_ADMIN_ACCOUNT en el .env}"
+      MYAAC_ADMIN_EMAIL: "${MYAAC_ADMIN_EMAIL:?falta MYAAC_ADMIN_EMAIL en el .env}"
+      MYAAC_ADMIN_PASSWORD: "${MYAAC_ADMIN_PASSWORD:?falta MYAAC_ADMIN_PASSWORD en el .env}"
+      MYAAC_ADMIN_PLAYER: "${MYAAC_ADMIN_PLAYER:-GM Nocthold}"
+      MYAAC_CLIENT_VERSION: "${MYAAC_CLIENT_VERSION:-1513}"
+      MYAAC_TIMEZONE: "${TZ:-Europe/Madrid}"
+    ports:
+      # Solo desde el propio VPS (túnel SSH). Así nadie de fuera puede registrarse.
+      - "127.0.0.1:${MYAAC_PORT:?falta MYAAC_PORT en el .env}:80"
+    networks:
+      - interna
+    depends_on:
+      db:
+        condition: service_healthy
+      server:
+        condition: service_started
+
+volumes:
+  db:
+  server-data:
+
+networks:
+  interna:
