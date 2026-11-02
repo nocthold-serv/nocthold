@@ -7,15 +7,26 @@ construir la imagen Docker se copia `data-canary` a `/canary/data-nocthold` y se
 ponen estos archivos encima (ver `docker/Dockerfile.x86`). Así, cuando Canary
 se actualice, no hay que fusionar una copia entera de `data-canary`.
 
-## Qué hay
+## Qué hay (1.0.0-alpha.1)
 
 | Carpeta | Qué es | Estado |
 |---|---|---|
-| `monster/nocthold/` | 7 monstruos (4 normales y 3 jefes) | Se cargan. Aspecto provisional, sin botín ni experiencia, jefes sin fases. |
-| `npc/nocthold_npcs.lua` | 5 NPC con diálogo básico | Se cargan, pero aún no están colocados en ningún mapa. |
-| `scripts/lib/nocthold.lua` | Lista de lo que debe cargarse | Lo usan el aviso de arranque y `/nocthold status`. |
+| `monster/nocthold/` | 7 monstruos (4 normales y 3 jefes con fases: al 70 % y al 35 % de vida llaman refuerzos) | Dan oro; sin experiencia todavía. Aspecto provisional. |
+| `npc/nocthold_npcs.lua` | 5 NPC con diálogo | Se colocan solos al generar la mazmorra. |
+| `scripts/nocthold/spells/` | 30 hechizos: Guardian (knight), Warden (druid) y Arcanist (sorcerer) | Se lanzan con `nocthold <palabra>` (lista: `/nocthold spells`). Balance sin ajustar. |
+| `scripts/nocthold/runtime/` | La Forja Caída: 6 encuentros, llaves 0-10, cronómetro y recompensa en oro | Una sola arena compartida (un grupo a la vez); el estado se pierde al reiniciar. |
+| `scripts/lib/nocthold.lua` | Lista de lo que debe cargarse y `Nocthold.latin1()` | Lo usan el aviso de arranque y `/nocthold status`. |
 | `scripts/nocthold/nocthold_startup.lua` | Al arrancar escribe `[NOCTHOLD] OK ...` en el log | La comprobación de GitHub busca esa línea. |
-| `scripts/nocthold/nocthold_admin.lua` | Comando `/nocthold` y `/nocthold status` (solo god) | Solo lee; no cambia nada. |
+| `scripts/nocthold/nocthold_admin.lua` | `/nocthold status` y `/nocthold spells` (solo god) | Solo lee. |
+
+### Probar la mazmorra
+
+1. Con un god, ponte encima de una casilla normal y escribe `!nocthold buildmap`. Genera la mazmorra en X=64000, Y=64000, Z=7 copiando el suelo que pisas, y coloca los 5 NPC. Hay que repetirlo después de cada reinicio del servidor.
+2. El líder del grupo (1 a 5 jugadores, a menos de 12 casillas): `!nocthold key 0` (de 0 a 10), `!nocthold enter` y `!nocthold start`.
+3. `!nocthold status` muestra la fase y el tiempo; `!nocthold leave` te devuelve donde estabas; `!nocthold reset` (god) lo reinicia todo.
+4. Desde la llave 4 sale un Sabueso más en cada grupo; desde la 7, un Coloso más con el jefe final.
+
+Tests sin servidor: `luajit tests/lua/test_nocthold_datapack.lua` y `luajit tests/lua/test_nocthold_dungeon.lua`.
 
 El diseño (GDD, magias, talentos, objetos, mazmorra, afijos, misiones, mapa,
 tablas SQL) no está en este repositorio, que es público.
@@ -37,14 +48,14 @@ los datapacks tienen sus propias migraciones.
 
 GitHub Actions ya lo comprueba en cada PR que toca el servidor (paso
 "Datapack propio" del workflow *Servidor*): arranca con este datapack y exige
-ver `[NOCTHOLD] OK Contenido propio 0.2.1 cargado: 7/7 monstruos, 5/5 NPC.` sin errores en
+ver `[NOCTHOLD] OK Contenido propio 1.0.0-alpha.1 cargado: 7/7 monstruos, 5/5 NPC, 30/30 hechizos.` sin errores en
 nuestros archivos.
 
 ## Pendiente (siguiente trabajo)
 
-- Convertir las 30 magias diseñadas en hechizos reales, una a una.
-- Fases y avisos de los jefes; botín y experiencia de los monstruos.
-- Elegir aspectos (lookType) e IDs de objetos a partir de los assets del cliente 15.25.
-- Mapa propio `.otbm` en RME y colocar los NPC.
-- Mazmorras Mythic+ (instancias, llaves, temporizador, recompensas).
+- Experiencia de los monstruos, botín de verdad y aspectos (lookType) e IDs a partir de los assets del cliente 15.25.
+- Ajustar el daño y la curación de los 30 hechizos jugando.
+- Mazmorra instanciada (varios grupos a la vez), escalado de vida y daño por llave, y guardar llaves y ranking en la base de datos.
+- Mapa propio `.otbm` en RME (ahora la mazmorra es una sala generada al vuelo).
+- Talentos, equipo y misiones: solo existen en el diseño.
 - Acentos y ñ: los textos para el jugador pasan por `Nocthold.latin1()` (el cliente lee Latin-1). Úsalo en todo texto nuevo con tildes.

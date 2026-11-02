@@ -1,5 +1,5 @@
 -- Nocthold NPC prototypes for Canary Revscripts/NpcType API.
--- All five are registered as NPC types. A map NPC placement file is still required to spawn them.
+-- All five are registered as NPC types. The dungeon runtime places them with !nocthold buildmap.
 -- Nocthold: cada NPC se apunta en Nocthold.npcs (scripts/lib/nocthold.lua) para el aviso de arranque.
 
 local function registerNoctholdNpc(def)
@@ -76,7 +76,7 @@ registerNoctholdNpc({
     greeting = "Puedo hablarte de los contratos, la Forja Caída o las temporadas.",
     replies = {
         contrato = "Los Marjales de Ceniza están infestados. Empieza por los Carroñeros de Escoria y los Sabuesos.",
-        forja = "La Forja Caída tiene tres guardianes. Reúne cinco aventureros antes de entrar.",
+        forja = "La Forja Caída ya está disponible en alfa. Usa !nocthold key 0-10, !nocthold enter y !nocthold start. El grupo admite hasta cinco aventureros.",
         temporada = "Las temporadas rotarán afijos y recompensas. El Cronista conserva los registros.",
     },
     fallback = "Pregúntame por contrato, forja o temporada.",
@@ -100,7 +100,7 @@ registerNoctholdNpc({
     greeting = "Custodio los registros de Eryndor.",
     replies = {
         historia = "La Forja Caída era el corazón industrial de Eryndor. Algo despertó bajo sus cámaras.",
-        temporada = "El marcador de temporada guardará puntuación, nivel de llave, tiempo, muertes y grupo.",
+        temporada = "Consulta el estado de la expedición con !nocthold status. El ranking de temporada aún está pendiente.",
         sintonia = "La sintonización de mazmorra desbloqueará dificultades y rutas conforme avances.",
     },
     fallback = "Pregúntame por historia, temporada o sintonía.",
@@ -123,7 +123,7 @@ registerNoctholdNpc({
     voice = "Cinco nombres. Una llave. Una historia.",
     greeting = "Registro las expediciones de cinco aventureros.",
     replies = {
-        llave = "El sistema de llaves permitirá escoger mazmorra, nivel y afijos. Aún no está habilitado para iniciar runs.",
+        llave = "En alfa puedes preparar una llave con !nocthold key 0-10. El líder entra con !nocthold enter e inicia con !nocthold start. Solo hay una arena compartida a la vez.",
         grupo = "La composición recomendada es un tanque, un sanador y tres DPS.",
         ranking = "El ranking se calculará en servidor y guardará las mejores ejecuciones válidas.",
     },

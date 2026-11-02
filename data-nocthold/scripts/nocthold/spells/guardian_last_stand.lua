@@ -1,0 +1,27 @@
+-- Nocthold
+-- Increases maximum health by 15% for 8 seconds. Does not make the player immune to mechanics.
+
+local spell = Spell("instant")
+spell:name("Last Stand")
+spell:words("nocthold last stand")
+spell:group("support")
+spell:cooldown(90000)
+spell:groupCooldown(1000)
+spell:level(8)
+spell:mana(35)
+spell:needTarget(false)
+spell:isSelfTarget(true)
+spell:allowOnSelf(true)
+spell:isAggressive(false)
+spell:needLearn(false)
+spell:vocation("knight;true", "elite knight;true")
+spell:onCastSpell(function(creature, variant)
+    local condition = Condition(CONDITION_ATTRIBUTES)
+    condition:setParameter(CONDITION_PARAM_TICKS, 8000)
+    condition:setParameter(CONDITION_PARAM_STAT_MAXHITPOINTSPERCENT, 115)
+    creature:addCondition(condition)
+    creature:getPosition():sendMagicEffect(CONST_ME_MAGIC_BLUE)
+    return true
+end)
+spell:register()
+Nocthold.registerSpell("Last Stand")

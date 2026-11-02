@@ -5,7 +5,7 @@ local noctholdStartup = GlobalEvent("NoctholdStartup")
 
 function noctholdStartup.onStartup()
 	local monsters, missing = Nocthold.countMonsters()
-	local ok = monsters == #Nocthold.monsters and #Nocthold.npcs == Nocthold.expectedNpcs
+	local ok = monsters == #Nocthold.monsters and #Nocthold.npcs == Nocthold.expectedNpcs and #Nocthold.spells == Nocthold.expectedSpells
 	if ok then
 		logger.info("[NOCTHOLD] OK " .. Nocthold.statusText())
 	else
