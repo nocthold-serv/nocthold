@@ -234,6 +234,11 @@ Si la copia solo está en Drive, bájala antes con
    del día: lo aplica a las **6:01**, justo después del server save de las
    6:00 (Canary avisa a los jugadores 5 minutos antes y se reinicia). Antes de
    cambiar de versión hace una copia de la base de datos en `~/copias/prod`.
+   Al fusionar en `prod`, GitHub también publica las **novedades para los
+   jugadores**: junta el apartado "Para los jugadores" de cada PR nuevo y crea
+   una Release "Novedades del <día>" en
+   <https://github.com/nocthold-serv/nocthold/releases>, lista para copiar en
+   Discord. Por eso ese apartado del PR se escribe en lenguaje de jugador.
 4. **Si la versión nueva no arranca** en 10 minutos, la instancia vuelve sola a
    la anterior y espera a la siguiente versión que llegue de GitHub.
 

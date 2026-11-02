@@ -1,0 +1,35 @@
+---
+# Novedades para los jugadores (texto no técnico) en cada push a prod.
+#
+# Junta el apartado "## Para los jugadores" de la descripción de cada PR que
+# entra en prod con este push y, si hay algo, crea una Release de GitHub
+# "Novedades del <día>" (sin marcarla como la última, para no tapar la
+# descarga del cliente). El texto está listo para copiar en Discord.
+# Ver .github/scripts/novedades.py.
+name: Novedades
+
+on:
+  push:
+    branches: [prod]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  novedades:
+    name: Novedades para los jugadores
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Crear la Release con las novedades
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ANTES: ${{ github.event.before }}
+          DESPUES: ${{ github.sha }}
+        run: |
+          python3 .github/scripts/novedades.py "$GITHUB_REPOSITORY" "$ANTES" "$DESPUES" | tee novedades.txt
+          { echo '### Novedades'; echo; cat novedades.txt; } >> "$GITHUB_STEP_SUMMARY"
