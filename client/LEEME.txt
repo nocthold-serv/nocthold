@@ -1,0 +1,14 @@
+NOCTHOLD - cliente para Windows
+
+1. Descomprime esta carpeta donde quieras (Escritorio, Documentos...).
+   No la pongas en "Archivos de programa": el cliente necesita escribir en ella.
+2. Abre Nocthold.exe.
+   Si Windows avisa con "Windows protegió su PC", pulsa "Más información"
+   y luego "Ejecutar de todas formas" (el programa no está firmado todavía).
+3. Escribe tu correo y tu contraseña y pulsa Login.
+   La primera vez el cliente descarga los gráficos del juego (unos minutos).
+   Las siguientes veces ya entra directo.
+
+¿Problemas? Mándanos el fichero .log que hay en esta carpeta.
+
+Cliente basado en OTClient Redemption (licencia MIT, ver LICENSE-OTClient.txt).

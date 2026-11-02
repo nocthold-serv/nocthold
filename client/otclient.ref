@@ -1,0 +1,4 @@
+# Commit de opentibiabr/otclient (OTClient Redemption) que compilamos.
+# Para actualizar el cliente: cambia el commit, abre un PR y mira que el
+# workflow "Cliente Windows" salga en verde antes de fusionar.
+1fcea26f23ef1d1857103ef446c0190955523ca8

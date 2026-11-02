@@ -1,0 +1,146 @@
+# Compila OTClient Redemption para Windows y lo empaqueta ya configurado para
+# Nocthold: el jugador descomprime, abre Nocthold.exe y solo pone correo y
+# contraseña. Ver client/README.md.
+#
+# - En cada PR o push que toque client/ (o este fichero): compila y deja los
+#   .zip como "artifact" del run (se descargan desde la pestaña Actions).
+# - Al crear una etiqueta cliente-vX.Y.Z: además publica una Release con los
+#   .zip, que es el enlace que se da a los jugadores.
+# - También se puede lanzar a mano (Actions > Cliente Windows > Run workflow).
+name: Cliente Windows
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "client/**"
+      - ".github/workflows/cliente-windows.yml"
+  push:
+    branches: [develop]
+    tags: ["cliente-v*"]
+    paths:
+      - "client/**"
+      - ".github/workflows/cliente-windows.yml"
+
+concurrency:
+  group: cliente-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  compilar:
+    name: Compilar y empaquetar
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 180
+    env:
+      # Caché propia de vcpkg: la primera vez compila todas las librerías
+      # (~1 h); después tarda unos minutos.
+      VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}\\vcpkg-cache,readwrite"
+    steps:
+      - name: Descargar nuestro repo
+        uses: actions/checkout@v4
+        with:
+          path: nocthold
+          sparse-checkout: client
+
+      - name: Leer la versión fijada de OTClient
+        id: ref
+        shell: pwsh
+        run: |
+          $ref = (Get-Content nocthold/client/otclient.ref | Where-Object { $_ -notmatch '^\s*(#|$)' } | Select-Object -First 1).Trim()
+          "sha=$ref" >> $env:GITHUB_OUTPUT
+
+      - name: Descargar OTClient Redemption
+        uses: actions/checkout@v4
+        with:
+          repository: opentibiabr/otclient
+          ref: ${{ steps.ref.outputs.sha }}
+          path: otclient
+
+      - name: Versión de vcpkg
+        shell: pwsh
+        run: |
+          $json = Get-Content otclient/vcpkg.json -Raw | ConvertFrom-Json
+          "VCPKG_COMMIT=$($json.'builtin-baseline')" >> $env:GITHUB_ENV
+          New-Item -ItemType Directory -Force -Path vcpkg-cache | Out-Null
+
+      - name: Caché de vcpkg
+        uses: actions/cache@v4
+        with:
+          path: vcpkg-cache
+          key: vcpkg-win-${{ hashFiles('otclient/vcpkg.json', 'otclient/vcpkg-configuration.json', 'otclient/overlay-ports/**', 'otclient/cmake/triplets/**') }}
+          restore-keys: vcpkg-win-
+
+      - name: Preparar vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitURL: "https://github.com/microsoft/vcpkg.git"
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
+
+      - name: Compilar
+        uses: lukka/run-cmake@v10
+        with:
+          cmakeListsTxtPath: ${{ github.workspace }}/otclient/CMakeLists.txt
+          configurePreset: windows-release
+          buildPreset: windows-release
+          configurePresetAdditionalArgs: "['-DTOGGLE_BIN_FOLDER=ON', '-DOPTIONS_ENABLE_IPO=OFF', '-DOPTIONS_ENABLE_SCCACHE=OFF', '-DOTCLIENT_BUILD_TESTS=OFF']"
+
+      - name: Empaquetar (producción y pruebas)
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem otclient/build/windows-release/bin -Filter *.exe | Select-Object -First 1
+          if (-not $exe) { throw "No se ha generado el .exe" }
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $canales = @{ prod = "Nocthold"; test = "Nocthold-Pruebas" }
+          foreach ($canal in $canales.Keys) {
+            $nombre = $canales[$canal]
+            $dir = "paquetes/$nombre"
+            New-Item -ItemType Directory -Force -Path $dir | Out-Null
+            Copy-Item $exe.FullName "$dir/$nombre.exe"
+            foreach ($cosa in "data", "modules", "mods", "init.lua", "config.ini", "otclientrc.lua", "cacert.pem") {
+              Copy-Item -Recurse "otclient/$cosa" $dir
+            }
+            Copy-Item otclient/LICENSE "$dir/LICENSE-OTClient.txt"
+            Copy-Item nocthold/client/LEEME.txt $dir
+            python nocthold/client/configurar.py $dir $canal
+            if ($LASTEXITCODE -ne 0) { throw "configurar.py ha fallado" }
+            Compress-Archive -Path $dir -DestinationPath "dist/$nombre-Windows.zip" -CompressionLevel Optimal
+          }
+          Get-ChildItem dist | Format-Table Name, Length
+
+      - name: Subir los .zip al run
+        uses: actions/upload-artifact@v4
+        with:
+          name: cliente-windows
+          path: dist/*.zip
+          retention-days: 30
+
+  publicar:
+    name: Publicar Release
+    if: startsWith(github.ref, 'refs/tags/cliente-v')
+    needs: compilar
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: cliente-windows
+          path: dist
+
+      - name: Crear la Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # Si la release ya existe (creada desde la web), solo se le añaden los .zip.
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/*.zip --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" dist/*.zip \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Cliente Nocthold ${TAG#cliente-}" \
+              --notes "Descarga **Nocthold-Windows.zip**, descomprímelo (no lo abras desde dentro del .zip) y abre **Nocthold.exe**. La primera vez descarga los gráficos del juego (unos minutos). Después entra con tu correo y contraseña. **Nocthold-Pruebas-Windows.zip** es solo para testers."
+          fi

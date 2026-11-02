@@ -17,3 +17,4 @@ docker/**/*.yml text eol=lf
 docker/**/*.yaml text eol=lf
 docker/**/*.md text eol=lf
 docker/**/*.dist text eol=lf
+client/LEEME.txt text eol=crlf
