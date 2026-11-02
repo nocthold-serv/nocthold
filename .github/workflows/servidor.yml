@@ -1,0 +1,234 @@
+---
+# Comprueba el servidor y construye la imagen Docker de Nocthold (fase 3).
+#
+# - Comprobaciones rápidas (1-2 min): sintaxis de todos los .lua, tests Lua de
+#   tests/lua y shellcheck de los scripts de infra/.
+# - Imagen y arranque: compila Canary en Docker (docker/Dockerfile.x86), levanta
+#   MariaDB + servidor + login con nuestro infra/canary/docker-compose.yml,
+#   espera a "server online!" y prueba un login real con la cuenta de ejemplo.
+#   Si el PR no toca nada del servidor, este paso se salta (y cuenta como bien).
+# - En cada push a develop o prod, si todo ha ido bien, sube la imagen a
+#   ghcr.io/nocthold-serv/nocthold con la etiqueta de la rama (develop / prod) y
+#   otra con el commit (sha-abc1234). El VPS la descarga solo: ver
+#   infra/canary/README.md, apartado "Despliegue automático".
+#
+# Estos dos checks son los que se marcan como obligatorios en develop, main y
+# prod (issue #34). Por eso el workflow corre en TODOS los PR, sin filtro de
+# rutas: un check obligatorio que no llega a correr deja el PR bloqueado.
+name: Servidor
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [develop, prod]
+
+concurrency:
+  group: servidor-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  IMAGEN: ghcr.io/nocthold-serv/nocthold
+
+jobs:
+  rapidas:
+    name: Comprobaciones rápidas
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Instalar LuaJIT
+        run: sudo apt-get update -q && sudo apt-get install -y -q luajit
+
+      - name: Sintaxis de todos los .lua
+        run: |
+          errores="$(find data data-canary data-otservbr-global -name '*.lua' -print0 |
+            xargs -0 -n 50 -P 4 sh -c 'for f; do luajit -b "$f" /dev/null 2>&1; done' sh)"
+          if [ -n "$errores" ]; then
+            echo "$errores" | sed 's/^/::error::/'
+            exit 1
+          fi
+          echo "Todos los .lua se leen bien."
+
+      - name: Tests Lua (tests/lua)
+        run: |
+          fallos=0
+          for f in tests/lua/test_*.lua; do
+            echo "=== $f ==="
+            luajit "$f" || fallos=1
+          done
+          exit $fallos
+
+      - name: Shellcheck de los scripts de infra
+        run: shellcheck -S warning infra/canary/*.sh infra/vps/*.sh
+
+  cambios:
+    name: ¿Toca el servidor?
+    runs-on: ubuntu-24.04
+    outputs:
+      servidor: ${{ steps.mirar.outputs.servidor }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - id: mirar
+        env:
+          EVENTO: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENTO" != pull_request ]; then
+            echo "servidor=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          patron='^(src/|data|docker/|cmake/|CMakeLists.txt|CMakePresets.json|vcpkg|config.lua.dist|schema.sql|key.pem|infra/canary/|\.github/workflows/servidor.yml)'
+          if git diff --name-only "$BASE"...HEAD | grep -qE "$patron"; then
+            echo "servidor=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Este PR no toca el servidor: no hace falta compilar."
+            echo "servidor=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  imagen:
+    name: Imagen Docker y arranque
+    needs: [rapidas, cambios]
+    if: needs.cambios.outputs.servidor == 'true'
+    runs-on: ubuntu-24.04
+    # La primera vez compila todas las librerías (vcpkg): puede pasar de la hora.
+    # Después van en caché y tarda bastante menos.
+    timeout-minutes: 150
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Liberar disco del runner
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - name: Etiquetas de la imagen
+        id: etiquetas
+        env:
+          SHA: ${{ github.sha }}
+        run: echo "corto=${SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Entrar en ghcr.io
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Compilar la imagen
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile.x86
+          load: true
+          push: false
+          tags: nocthold:ci
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.title=Nocthold
+          build-args: |
+            VCPKG_FEED_URL=https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+            VCPKG_FEED_USERNAME=${{ github.repository_owner }}
+            VCPKG_BINARY_CACHE_MODE=${{ github.event_name == 'push' && 'readwrite' || 'read' }}
+          secrets: |
+            github_token=${{ github.token }}
+          cache-from: type=gha,scope=servidor
+          cache-to: ${{ github.event_name == 'push' && 'type=gha,scope=servidor,mode=max,ignore-error=true' || '' }}
+
+      - name: Arrancar MariaDB + servidor + login
+        run: |
+          cat > ci.env <<'EOF'
+          SERVER_NAME=Nocthold CI
+          SERVER_IP=127.0.0.1
+          LOGIN_PORT=7171
+          GAME_PORT=7172
+          STATUS_PORT=7173
+          LOGIN_HTTP_PORT=8088
+          CANARY_IMAGE=nocthold:ci
+          MAP_URL=https://github.com/opentibiabr/canary/releases/download/v3.6.1/otservbr.otbm
+          DB_NAME=nocthold_ci
+          DB_USER=nocthold
+          DB_PASSWORD=ci
+          DB_ROOT_PASSWORD=ci
+          MYAAC_PORT=8080
+          MYAAC_ADMIN_ACCOUNT=admin
+          MYAAC_ADMIN_EMAIL=ci@example.com
+          MYAAC_ADMIN_PASSWORD=ci
+          EOF
+          docker compose -p ci -f infra/canary/docker-compose.yml --env-file ci.env up -d db server login
+
+      - name: Esperar a "server online!"
+        run: |
+          for i in $(seq 1 120); do
+            if docker compose -p ci -f infra/canary/docker-compose.yml --env-file ci.env logs server | grep -q "server online!"; then
+              echo "Servidor online tras unos $((i * 10)) s."
+              exit 0
+            fi
+            estado="$(docker inspect -f '{{.State.Status}} {{.RestartCount}}' ci-server-1)"
+            case "$estado" in
+              exited*|"running "[1-9]*) echo "::error::El servidor se ha caído al arrancar ($estado)."; exit 1 ;;
+            esac
+            sleep 10
+          done
+          echo "::error::El servidor no dijo 'server online!' en 20 minutos."
+          exit 1
+
+      - name: Probar el login (lista de personajes)
+        run: |
+          for i in $(seq 1 30); do
+            respuesta="$(curl -sS -H 'Content-Type: application/json' \
+              -d '{"email":"@god","password":"god","type":"login","clientversion":"1525"}' \
+              http://localhost:8088/login || true)"
+            if echo "$respuesta" | grep -q '"worlds"' && echo "$respuesta" | grep -q 'Sample'; then
+              echo "El login devuelve el mundo y los personajes."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::El login no devolvió la lista de personajes. Respuesta: $respuesta"
+          exit 1
+
+      - name: Puertos del juego abiertos
+        run: |
+          for puerto in 7171 7172 7173; do
+            timeout 5 bash -c "</dev/tcp/127.0.0.1/$puerto" || { echo "::error::El puerto $puerto no responde."; exit 1; }
+          done
+
+      - name: Logs si algo falla
+        if: failure()
+        run: docker compose -p ci -f infra/canary/docker-compose.yml --env-file ci.env logs --no-color --tail 300
+
+      - name: Subir la imagen a ghcr.io
+        if: github.event_name == 'push'
+        env:
+          RAMA: ${{ github.ref_name }}
+          CORTO: ${{ steps.etiquetas.outputs.corto }}
+        run: |
+          for etiqueta in "$RAMA" "sha-$CORTO"; do
+            docker tag nocthold:ci "$IMAGEN:$etiqueta"
+            docker push "$IMAGEN:$etiqueta"
+          done
+          {
+            echo "### Imagen publicada"
+            echo
+            echo "- \`$IMAGEN:$RAMA\`"
+            echo "- \`$IMAGEN:sha-$CORTO\` (para volver a esta versión)"
+          } >> "$GITHUB_STEP_SUMMARY"
