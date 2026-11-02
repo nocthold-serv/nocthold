@@ -1,4 +1,4 @@
-# Levantar Canary en el VPS (fase 2)
+# Canary en el VPS: instancias, copias y despliegue
 
 Dos instancias independientes en el mismo VPS, cada una con su propia base de
 datos:
@@ -21,10 +21,12 @@ Como nadie de fuera llega a la web, nadie puede registrarse: las cuentas las
 creamos nosotros (issue #26). Tampoco se crean las cuentas de prueba de Canary
 (todas tienen la contraseña `test`).
 
-**De momento** las dos instancias usan la imagen oficial de Canary 3.6.1, con
-su datapack y su mapa global. En la fase 3 cada una pasará a usar nuestra propia
-imagen (pruebas desde `develop`, producción desde `prod`): solo hay que cambiar
-`CANARY_IMAGE` en el `.env`.
+**Imagen del servidor.** Cada instancia usa la imagen que diga `CANARY_IMAGE`
+en su `.env`. La nuestra la construye GitHub Actions desde el repositorio:
+`ghcr.io/nocthold-serv/nocthold:develop` para pruebas y `:prod` para
+producción (ver [Despliegue automático](#despliegue-automático-fase-3)).
+Producción arrancó con la oficial de Canary 3.6.1 y sigue con ella hasta que se
+cambie a mano (paso 4 de ese apartado).
 
 ## 1. Entrar al VPS y bajar el repositorio
 
@@ -62,10 +64,17 @@ log, el servidor sigue funcionando):
 
 ## 3. Arrancar pruebas
 
+Pruebas usa nuestra imagen (`:develop`), así que antes tiene que estar hecho el
+paso 1 de [Despliegue automático](#despliegue-automático-fase-3).
+
 ```bash
 ./nocthold.sh test up
 ./nocthold.sh test logs
+./nocthold.sh test clave-god
 ```
+
+La última orden cambia la contraseña de la cuenta `god` (administrador), que
+viene de serie con la contraseña `god`. Guarda la nueva en Bitwarden.
 
 ## 4. Guardar las contraseñas
 
@@ -120,6 +129,9 @@ Siempre desde `~/nocthold/infra/canary`:
 | Parar (sin borrar nada) | `./nocthold.sh prod stop` |
 | Copia de la base de datos | `./nocthold.sh prod backup` (queda en `~/copias/prod`) |
 | Comprobar que la última copia se restaura | `./nocthold.sh prod probar-copia` |
+| Qué versión está corriendo | `./nocthold.sh prod version` |
+| Aplicar ya lo último de GitHub | `./nocthold.sh prod actualizar` |
+| Volver a la versión anterior | `./nocthold.sh prod volver` |
 
 Cambia `prod` por `test` para la instancia de pruebas. Al parar, Canary tiene
 hasta 2 minutos para guardar a los jugadores.
@@ -202,3 +214,117 @@ Si la copia solo está en Drive, bájala antes con
 `rclone copy gdrive:nocthold-copias/prod/FICHERO.sql.gz ~/copias/prod/`.
 
 **Nunca uses `down -v`** en producción: borra la base de datos.
+
+## Despliegue automático (fase 3)
+
+### Cómo llega un cambio al servidor
+
+1. **PR a `develop`.** GitHub Actions pasa el workflow **Servidor**: comprueba
+   la sintaxis de todos los `.lua`, los tests Lua y los scripts; compila la
+   imagen Docker; la arranca con MariaDB y este mismo `docker-compose.yml`;
+   espera a "server online!" y prueba un login real. Si algo falla, el PR sale
+   en rojo y no se puede fusionar.
+2. **Fusionar en `develop`.** Actions vuelve a compilar y sube la imagen
+   `ghcr.io/nocthold-serv/nocthold:develop`. La instancia de **pruebas** mira
+   cada 5 minutos si hay imagen nueva y, si la hay, se reinicia con ella.
+   Desde que fusionas hasta que está en pruebas pasan unos 20-30 minutos (lo
+   que tarda en compilar).
+3. **Pasar a producción.** PR de `develop` a `main` y de `main` a `prod`. Al
+   fusionar en `prod` se sube `:prod`. **Producción** no se reinicia en mitad
+   del día: lo aplica a las **6:01**, justo después del server save de las
+   6:00 (Canary avisa a los jugadores 5 minutos antes y se reinicia). Antes de
+   cambiar de versión hace una copia de la base de datos en `~/copias/prod`.
+4. **Si la versión nueva no arranca** en 10 minutos, la instancia vuelve sola a
+   la anterior y espera a la siguiente versión que llegue de GitHub.
+
+Además de la imagen, cada actualización baja los scripts y el
+`docker-compose.yml` de la rama en la que está el repositorio del VPS
+(`develop`). No toques ficheros del repositorio a mano en el VPS: si hay
+cambios locales, la actualización no puede traer los nuevos (lo avisa en el
+log). Los `.env` no cuentan, esos no están en Git.
+
+Cada imagen se sube también con el commit (`:sha-abc1234`), que es lo que
+permite volver a una versión concreta.
+
+### Puesta en marcha (una sola vez)
+
+**1. Hacer pública la imagen.** El primer push a `develop` después de fusionar
+este cambio crea el paquete `nocthold` en GitHub, privado. Como el repositorio
+ya es público, lo más sencillo es que la imagen también lo sea (así el VPS la
+baja sin contraseña):
+
+- Abre <https://github.com/orgs/nocthold-serv/packages/container/nocthold/settings>
+  (o: organización → **Packages** → **nocthold** → **Package settings**).
+- Abajo del todo, en **Danger Zone**, pulsa **Change visibility**, elige
+  **Public** y escribe `nocthold` para confirmar.
+
+**2. En el VPS**, trae los scripts nuevos:
+
+```bash
+cd ~/nocthold && git pull
+cd infra/canary
+```
+
+**3. Pruebas.** Arráncala (apartado 3 de arriba) y activa su actualización
+automática:
+
+```bash
+./nocthold.sh test up
+./nocthold.sh test clave-god
+./nocthold.sh test auto
+```
+
+En UptimeRobot añade los monitores de los puertos 7271 y 8188.
+
+**4. Producción.** Solo cuando la rama `prod` tenga ya su imagen y la hayáis
+probado en pruebas. Cambia la imagen en `prod.env`, aplícala a una hora
+tranquila y activa la actualización diaria:
+
+```bash
+sed -i 's#^CANARY_IMAGE=.*#CANARY_IMAGE=ghcr.io/nocthold-serv/nocthold:prod#' prod.env
+./nocthold.sh prod actualizar
+./nocthold.sh prod auto
+```
+
+Ojo: producción se creó con la imagen oficial 3.6.1. Al pasar a la nuestra,
+Canary puede actualizar las tablas de la base de datos. La copia se hace sola
+antes, pero volver a la oficial después puede pedir restaurar esa copia
+([Restaurar de verdad](#restaurar-de-verdad)).
+
+### Ver qué está pasando
+
+```bash
+./nocthold.sh prod version     # imagen, commit y desde cuándo
+./nocthold.sh prod auto ver    # próxima actualización y log de las últimas
+./nocthold.sh test auto ver
+```
+
+Para quitar la actualización automática: `./nocthold.sh prod auto quitar`.
+
+### Volver atrás
+
+**Rápido, en el VPS** (un minuto):
+
+```bash
+./nocthold.sh prod volver            # a la versión que había antes
+./nocthold.sh prod volver abc1234    # o a un commit concreto de develop/prod
+```
+
+La instancia queda **fijada** en esa versión: la actualización automática no la
+toca hasta que digas lo contrario. En producción hace antes una copia de la
+base de datos.
+
+**Después, en GitHub**, deshaz el cambio malo para que no vuelva a entrar: en
+la página del PR que lo metió pulsa **Revert** (abajo, junto a "merged"). Eso
+crea un PR nuevo que lo deshace; fusiónalo en la rama que toque. Cuando la
+imagen arreglada esté subida, suelta la instancia:
+
+```bash
+./nocthold.sh prod soltar
+./nocthold.sh prod actualizar   # para aplicarla ya; si no, a las 6:01
+```
+
+**Si el cambio malo tocó la base de datos** (personajes, tablas nuevas…),
+volver a la imagen anterior no basta: restaura la copia hecha justo antes de la
+actualización. Está en `~/copias/prod` con la fecha y hora de esa mañana (ver
+[Restaurar de verdad](#restaurar-de-verdad)).
