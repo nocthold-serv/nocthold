@@ -111,12 +111,86 @@ Siempre desde `~/nocthold/infra/canary`:
 | Reiniciar solo el servidor | `./nocthold.sh prod restart server` |
 | Parar (sin borrar nada) | `./nocthold.sh prod stop` |
 | Copia de la base de datos | `./nocthold.sh prod backup` (queda en `~/copias/prod`) |
+| Comprobar que la última copia se restaura | `./nocthold.sh prod probar-copia` |
 
 Cambia `prod` por `test` para la instancia de pruebas. Al parar, Canary tiene
 hasta 2 minutos para guardar a los jugadores.
 
 Además, cada vez que arranca, el servidor deja una copia de su base de datos
-dentro del volumen `server-data`. Las copias diarias fuera del VPS van en el
-issue #24.
+dentro del volumen `server-data`.
+
+## Copias de seguridad en Google Drive (issue #24)
+
+Cada noche `copia-diaria.sh` copia la base de datos de cada instancia en marcha,
+la sube a la carpeta `nocthold-copias` del Drive de `team.nocthold@gmail.com` y
+borra las viejas (se guardan 7 días en el VPS y 30 en Drive). Los domingos,
+además, restaura la última copia de producción en una base de datos aparte para
+comprobar que sirve. Esa prueba no toca el servidor real.
+
+Se prepara una sola vez:
+
+**1. En el VPS**, instala rclone y trae los scripts nuevos:
+
+```bash
+sudo apt install -y rclone
+cd ~/nocthold && git pull
+```
+
+**2. En tu PC**, en PowerShell, instala rclone y conéctalo a Drive:
+
+```powershell
+winget install Rclone.Rclone
+```
+
+Cierra PowerShell, ábrela de nuevo y ejecuta:
+
+```powershell
+rclone config create gdrive drive scope=drive.file
+```
+
+Se abre el navegador: entra con `team.nocthold@gmail.com` y acepta. Con
+`drive.file`, rclone solo ve los archivos que crea él, no el resto del Drive.
+
+**3. Pasa esa conexión al VPS** (desde la misma PowerShell):
+
+```powershell
+ssh nocthold@158.220.91.85 "mkdir -p ~/.config/rclone"
+scp $env:APPDATA\rclone\rclone.conf nocthold@158.220.91.85:.config/rclone/rclone.conf
+```
+
+**4. En el VPS**, prueba una copia a mano:
+
+```bash
+~/nocthold/infra/canary/copia-diaria.sh
+~/nocthold/infra/canary/nocthold.sh prod probar-copia
+```
+
+La primera debe acabar con "Todo correcto" y en Drive debe aparecer la carpeta
+`nocthold-copias/prod`. La segunda muestra cuántas cuentas y personajes tiene la
+copia y acaba con "Restauración correcta".
+
+**5. Prográmala** para todas las noches a las 4:30 (hora del VPS):
+
+```bash
+(crontab -l 2>/dev/null; echo '30 4 * * * $HOME/nocthold/infra/canary/copia-diaria.sh >> $HOME/copias/copia-diaria.log 2>&1') | crontab -
+crontab -l
+```
+
+El resultado de cada noche queda en `~/copias/copia-diaria.log`.
+
+### Restaurar de verdad
+
+Solo si se ha perdido la base de datos. Primero se para el servidor para que no
+escriba encima:
+
+```bash
+cd ~/nocthold/infra/canary
+./nocthold.sh prod stop server
+gunzip -c ~/copias/prod/FICHERO.sql.gz | ./nocthold.sh prod exec -T db sh -c 'mariadb -u root -p"$MARIADB_ROOT_PASSWORD" "$MARIADB_DATABASE"'
+./nocthold.sh prod up
+```
+
+Si la copia solo está en Drive, bájala antes con
+`rclone copy gdrive:nocthold-copias/prod/FICHERO.sql.gz ~/copias/prod/`.
 
 **Nunca uses `down -v`** en producción: borra la base de datos.
