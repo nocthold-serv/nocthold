@@ -5,10 +5,14 @@ Uso (lo ejecuta el workflow .github/workflows/cliente-windows.yml):
 
     python client/configurar.py <carpeta del cliente> <prod|test>
 
-Cambia solo init.lua:
-  * Servers_init apunta a nuestro login por HTTP, así el jugador no ve los
-    campos de servidor, puerto ni versión: solo correo y contraseña.
-  * Nombre de la aplicación (título de la ventana, log y ajustes).
+Cambia:
+  * init.lua: Servers_init apunta a nuestro login por HTTP, así el jugador no
+    ve los campos de servidor, puerto ni versión: solo correo y contraseña.
+    Y el nombre de la aplicación (título de la ventana, log y ajustes).
+  * client_entergame/entergame.lua: con un único servidor, OTClient intenta
+    cargar los gráficos nada más arrancar; si aún no se han descargado sale
+    un error de "Tibia.dat". Solo los precargamos si ya están instalados (si
+    no, se descargan al pulsar Login).
 
 Si la versión de OTClient cambia y el texto que buscamos ya no está, el script
 falla en vez de dejar un cliente a medio configurar.
@@ -27,11 +31,37 @@ CANALES = {
 }
 
 
-def sustituir(texto: str, patron: str, nuevo: str, que: str) -> str:
+def sustituir(texto: str, patron: str, nuevo: str, que: str, fichero: str = "init.lua") -> str:
     resultado, n = re.subn(patron, lambda _m: nuevo, texto, count=1, flags=re.S)
     if n != 1:
-        sys.exit(f"ERROR: no encuentro {que} en init.lua; ¿ha cambiado OTClient?")
+        sys.exit(f"ERROR: no encuentro {que} en {fichero}; ¿ha cambiado OTClient?")
     return resultado
+
+
+PRECARGA_ORIGINAL = (
+    "    -- so it can display the boosted creature\n"
+    "    g_game.setClientVersion(clientVersion)\n"
+    "    g_game.setProtocolVersion(g_game.getClientProtocolVersion(clientVersion))\n"
+    "end\n"
+)
+PRECARGA_NOCTHOLD = (
+    "    -- so it can display the boosted creature\n"
+    "    -- Nocthold: solo si los gráficos ya están descargados (si no, error al arrancar)\n"
+    "    local assets = modules.client_assets\n"
+    "    if not (assets and assets.isClientVersionInstalled) or assets.isClientVersionInstalled(clientVersion) then\n"
+    "        g_game.setClientVersion(clientVersion)\n"
+    "        g_game.setProtocolVersion(g_game.getClientProtocolVersion(clientVersion))\n"
+    "    end\n"
+    "end\n"
+)
+
+
+def parchear_entergame(carpeta: Path) -> None:
+    fichero = carpeta / "modules" / "client_entergame" / "entergame.lua"
+    texto = fichero.read_text(encoding="utf-8")
+    if texto.count(PRECARGA_ORIGINAL) != 1:
+        sys.exit("ERROR: no encuentro la precarga de gráficos en entergame.lua; ¿ha cambiado OTClient?")
+    fichero.write_text(texto.replace(PRECARGA_ORIGINAL, PRECARGA_NOCTHOLD), encoding="utf-8")
 
 
 def main() -> None:
@@ -64,6 +94,7 @@ def main() -> None:
     )
 
     init.write_text(texto, encoding="utf-8")
+    parchear_entergame(carpeta)
     print(f"init.lua configurado para {canal['nombre']} ({url}, protocolo {PROTOCOLO})")
 
 
