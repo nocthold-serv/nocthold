@@ -1,3 +1,4 @@
+---
 # Compila OTClient Redemption para Windows y lo empaqueta ya configurado para
 # Nocthold: el jugador descomprime, abre Nocthold.exe y solo pone correo y
 # contraseña. Ver client/README.md.
