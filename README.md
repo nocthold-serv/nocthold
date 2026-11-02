@@ -1,5 +1,10 @@
 # Canary
 
+> **Nocthold:** este repositorio es nuestro fork de Canary. Cómo se monta el
+> servidor en el VPS, cómo llega cada cambio a pruebas y a producción y cómo se
+> vuelve atrás: [`infra/canary/README.md`](infra/canary/README.md). El cliente
+> para jugadores: [`client/README.md`](client/README.md).
+
 [![Discord](https://img.shields.io/discord/528117503952551936.svg?style=flat-square&logo=discord)](https://discord.gg/gvTj5sh9Mp)
 [![CI](https://github.com/opentibiabr/canary/actions/workflows/ci.yml/badge.svg)](https://github.com/opentibiabr/canary/actions/workflows/ci.yml)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=opentibiabr_canary&metric=alert_status)](https://sonarcloud.io/dashboard?id=opentibiabr_canary)

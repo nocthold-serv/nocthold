@@ -1,3 +1,6 @@
 # Contraseñas de cada instancia: nunca a Git.
 *.env
 !instancia.env.example
+
+# Imagen fijada con "./nocthold.sh <instancia> volver".
+*.fijada
