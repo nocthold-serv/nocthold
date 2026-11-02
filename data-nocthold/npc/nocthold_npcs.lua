@@ -3,6 +3,8 @@
 -- Nocthold: cada NPC se apunta en Nocthold.npcs (scripts/lib/nocthold.lua) para el aviso de arranque.
 
 local function registerNoctholdNpc(def)
+    -- Textos a Latin-1 para que el cliente muestre bien acentos y ñ (ver scripts/lib/nocthold.lua).
+    local t = Nocthold.latin1
     local npcType = Game.createNpcType(def.name)
     local npcConfig = {
         name = def.name,
@@ -21,7 +23,7 @@ local function registerNoctholdNpc(def)
             lookMount = 0,
         },
         flags = { floorchange = false },
-        voices = { interval = 15000, chance = 10, { text = def.voice } },
+        voices = { interval = 15000, chance = 10, { text = t(def.voice) } },
     }
 
     local keywordHandler = KeywordHandler:new()
@@ -39,7 +41,7 @@ local function registerNoctholdNpc(def)
     npcType.onCloseChannel = function(npc, player) npcHandler:onCloseChannel(npc, player) end
 
     local function greetCallback(npc, player)
-        npcHandler:setMessage(MESSAGE_GREET, "Saludos, |PLAYERNAME|. " .. def.greeting)
+        npcHandler:setMessage(MESSAGE_GREET, t("Saludos, |PLAYERNAME|. " .. def.greeting))
         return true
     end
 
@@ -49,24 +51,23 @@ local function registerNoctholdNpc(def)
         end
         local lowerMessage = message:lower()
         for keyword, reply in pairs(def.replies) do
-            if MsgContains(lowerMessage, keyword) then
-                npcHandler:say(reply, npc, player)
+            -- "contrato" también vale si el jugador escribe "contratos".
+            if MsgContains(lowerMessage, keyword) or MsgContains(lowerMessage, keyword .. "s") then
+                npcHandler:say(t(reply), npc, player)
                 return true
             end
         end
-        npcHandler:say(def.fallback, npc, player)
+        npcHandler:say(t(def.fallback), npc, player)
         return true
     end
 
     npcHandler:setCallback(CALLBACK_GREET, greetCallback)
     npcHandler:setCallback(CALLBACK_MESSAGE_DEFAULT, creatureSayCallback)
-    npcHandler:setMessage(MESSAGE_FAREWELL, "Que la luz te guíe.")
-    npcHandler:setMessage(MESSAGE_WALKAWAY, "Vuelve cuando estés preparado.")
+    npcHandler:setMessage(MESSAGE_FAREWELL, t("Que la luz te guíe."))
+    npcHandler:setMessage(MESSAGE_WALKAWAY, t("Vuelve cuando estés preparado."))
     npcHandler:addModule(FocusModule:new(), npcConfig.name, true, true, true)
     npcType:register(npcConfig)
-    if Nocthold then
-        Nocthold.registerNpc(def.name)
-    end
+    Nocthold.registerNpc(def.name)
 end
 
 registerNoctholdNpc({

@@ -2,7 +2,7 @@
 -- Sirve para que el aviso de arranque y /nocthold status digan qué se ha cargado de verdad.
 
 Nocthold = Nocthold or {}
-Nocthold.version = "0.2.0"
+Nocthold.version = "0.2.1"
 
 -- Los siete monstruos de monster/nocthold/ (nombre exacto de Game.createMonsterType).
 Nocthold.monsters = {
@@ -14,6 +14,16 @@ Nocthold.monsters = {
 	"La Maestra de Fundición Carmesí",
 	"El Corazón de la Forja",
 }
+
+-- El cliente (OTClient y el oficial) lee los textos en Latin-1, no en UTF-8: sin esto
+-- "Caída" sale como "CaÃ­da". Los .lua se escriben en UTF-8 normal y todo texto con
+-- acentos o ñ que vaya al jugador (nombres, diálogos) pasa por Nocthold.latin1().
+function Nocthold.latin1(text)
+	return (text:gsub("[\xC2\xC3][\x80-\xBF]", function(pair)
+		local first, second = pair:byte(1, 2)
+		return string.char((first - 0xC0) * 64 + (second - 0x80))
+	end):gsub("[\xC4-\xF4][\x80-\xBF]+", "?"))
+end
 
 -- Los cinco NPC de npc/nocthold_npcs.lua. Cada uno se apunta al registrarse.
 Nocthold.expectedNpcs = 5
@@ -27,7 +37,7 @@ function Nocthold.countMonsters()
 	local loaded = 0
 	local missing = {}
 	for _, name in ipairs(Nocthold.monsters) do
-		if MonsterType(name) then
+		if MonsterType(Nocthold.latin1(name)) then
 			loaded = loaded + 1
 		else
 			table.insert(missing, name)
