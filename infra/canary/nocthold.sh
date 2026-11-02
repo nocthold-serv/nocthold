@@ -7,6 +7,7 @@
 #   ./nocthold.sh prod ps        estado de los contenedores
 #   ./nocthold.sh prod ram       RAM y CPU que usa cada contenedor
 #   ./nocthold.sh prod backup    copia de la base de datos en ~/copias/prod
+#   ./nocthold.sh prod probar-copia   restaura la última copia aparte y la comprueba
 #   ./nocthold.sh prod stop      para la instancia (no borra nada)
 #   ./nocthold.sh prod <otro>    cualquier orden de "docker compose"
 #
@@ -25,7 +26,7 @@ case "$instancia" in
 		nombre="Nocthold Pruebas"; login=7271; juego=7272; estado=7273; http=8188; web=8180
 		bd=nocthold_test; gm="GM Pruebas" ;;
 	*)
-		sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
+		sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
 		exit 1 ;;
 esac
 [ -n "$orden" ] || { echo "Falta la orden. Ejemplo: ./nocthold.sh $instancia up"; exit 1; }
@@ -74,8 +75,26 @@ case "$orden" in
 		mkdir -p "$destino"
 		fichero="$destino/${DB_NAME}_$(date +%Y-%m-%d_%H%M).sql.gz"
 		"${compose[@]}" exec -T -e MYSQL_PWD="$DB_ROOT_PASSWORD" db \
-			mariadb-dump -u root --single-transaction --routines --triggers "$DB_NAME" | gzip >"$fichero"
+			mariadb-dump -u root --single-transaction --routines --triggers "$DB_NAME" | gzip >"$fichero.tmp"
+		mv "$fichero.tmp" "$fichero"
 		echo "Copia guardada en $fichero ($(du -h "$fichero" | cut -f1))" ;;
+	probar-copia)
+		# Restaura una copia en una MariaDB de usar y tirar (no toca la instancia real)
+		# y cuenta lo que hay dentro. Sin fichero, usa la copia más reciente.
+		fichero="${1:-$(ls -1t "$HOME/copias/$instancia"/*.sql.gz 2>/dev/null | head -1)}"
+		[ -f "$fichero" ] || { echo "No encuentro ninguna copia en ~/copias/$instancia"; exit 1; }
+		echo "Probando $fichero ..."
+		prueba="nocthold-prueba-copia-$$"
+		docker run -d --rm --name "$prueba" -e MARIADB_ROOT_PASSWORD=prueba -e MARIADB_DATABASE=prueba \
+			mariadb:11.4.13 >/dev/null
+		trap 'docker rm -f "$prueba" >/dev/null 2>&1 || true' EXIT
+		until docker exec "$prueba" healthcheck.sh --connect --innodb_initialized >/dev/null 2>&1; do sleep 2; done
+		gunzip -c "$fichero" | docker exec -i -e MYSQL_PWD=prueba "$prueba" mariadb -u root prueba
+		docker exec -e MYSQL_PWD=prueba "$prueba" mariadb -u root prueba -e \
+			"SELECT (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='prueba') AS tablas,
+			        (SELECT COUNT(*) FROM accounts) AS cuentas,
+			        (SELECT COUNT(*) FROM players) AS personajes;"
+		echo "Restauración correcta." ;;
 	down)
 		# Sin -v: nunca borra la base de datos. Para borrarla hay que hacerlo a mano.
 		"${compose[@]}" down "$@" ;;
