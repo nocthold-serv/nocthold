@@ -13,11 +13,14 @@ Cambia:
     cargar los gráficos nada más arrancar; si aún no se han descargado sale
     un error de "Tibia.dat". Solo los precargamos si ya están instalados (si
     no, se descargan al pulsar Login).
+  * Quita mods/game_bot: OTClient trae un bot (cavebot, targetbot) que no
+    queremos repartir a los jugadores.
 
 Si la versión de OTClient cambia y el texto que buscamos ya no está, el script
 falla en vez de dejar un cliente a medio configurar.
 """
 import re
+import shutil
 import sys
 from pathlib import Path
 
@@ -95,6 +98,10 @@ def main() -> None:
 
     init.write_text(texto, encoding="utf-8")
     parchear_entergame(carpeta)
+    bot = carpeta / "mods" / "game_bot"
+    if bot.exists():
+        shutil.rmtree(bot)
+        print("Quitado el bot integrado (mods/game_bot)")
     print(f"init.lua configurado para {canal['nombre']} ({url}, protocolo {PROTOCOLO})")
 
 
