@@ -48,7 +48,7 @@ jobs:
 
       - name: Sintaxis de todos los .lua
         run: |
-          errores="$(find data data-canary data-otservbr-global -name '*.lua' -print0 |
+          errores="$(find data data-canary data-otservbr-global data-umbral -name '*.lua' -print0 |
             xargs -0 -n 50 -P 4 sh -c 'for f; do luajit -b "$f" /dev/null 2>&1; done' sh)"
           if [ -n "$errores" ]; then
             echo "$errores" | sed 's/^/::error::/'
@@ -211,6 +211,41 @@ jobs:
           for puerto in 7171 7172 7173; do
             timeout 5 bash -c "</dev/tcp/127.0.0.1/$puerto" || { echo "::error::El puerto $puerto no responde."; exit 1; }
           done
+
+      - name: Datapack UMBRAL (monstruos, NPC y /umbral)
+        run: |
+          # Se vuelve a arrancar el servidor de pruebas con el datapack propio y el mapa
+          # pequeño de data-canary. Es una BD de usar y tirar: nunca se hace con la real.
+          compose="docker compose -p ci -f infra/canary/docker-compose.yml --env-file ci.env"
+          printf 'DATA_PACK=data-umbral\nMAP_NAME=canary\n' >> ci.env
+          $compose up -d --force-recreate server
+          for i in $(seq 1 60); do
+            logs="$($compose logs --no-color server)"
+            # Solo cuenta lo de este arranque (después de la línea del datapack nuevo).
+            logs="$(echo "$logs" | sed -n '/CANARY_DATA_PACK:\[data-umbral\]/,$p')"
+            if echo "$logs" | grep -q "server online!"; then
+              if echo "$logs" | grep -q "\[UMBRAL\] OK"; then
+                echo "$logs" | grep "\[UMBRAL\]"
+                propios='monster/umbral/|npc/umbral_npcs|scripts/umbral/|scripts/lib/umbral'
+                if echo "$logs" | grep -E "$propios" | grep -iE "error|warn"; then
+                  echo "::error::Hay avisos o errores en los archivos de UMBRAL."
+                  exit 1
+                fi
+                echo "UMBRAL arranca con sus 7 monstruos, 5 NPC y el comando /umbral."
+                exit 0
+              fi
+              echo "$logs" | grep -iE "umbral|error" | sed 's/^/::error::/'
+              echo "::error::El servidor arrancó, pero UMBRAL no dijo [UMBRAL] OK."
+              exit 1
+            fi
+            estado="$(docker inspect -f '{{.State.Status}} {{.RestartCount}}' ci-server-1)"
+            case "$estado" in
+              exited*|"running "[1-9]*) echo "::error::El servidor con data-umbral se ha caído al arrancar ($estado)."; exit 1 ;;
+            esac
+            sleep 10
+          done
+          echo "::error::El servidor con data-umbral no dijo 'server online!' en 10 minutos."
+          exit 1
 
       - name: Logs si algo falla
         if: failure()

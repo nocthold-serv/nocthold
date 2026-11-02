@@ -115,6 +115,10 @@ COPY LICENSE *.sql key.pem /canary/
 COPY data /canary/data
 COPY data-canary /canary/data-canary
 COPY data-otservbr-global /canary/data-otservbr-global
+# Datapack propio (UMBRAL): copia de data-canary con nuestros archivos encima.
+# Solo se usa si CANARY_DATA_PACK=data-umbral; producción sigue con data-otservbr-global.
+COPY data-canary /canary/data-umbral
+COPY data-umbral /canary/data-umbral
 COPY config.lua.dist /canary/config.lua
 
 WORKDIR /canary
