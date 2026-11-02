@@ -14,10 +14,13 @@ Puertos que quedan abiertos:
 
 ## 1. Contratar el VPS
 
-En OVHcloud, VPS-2 (o equivalente), **Ubuntu 24.04**, centro de datos en Europa.
+Cualquier proveedor con **Ubuntu 24.04**, CPU **x86** (no ARM), al menos
+**8 GB de RAM** y centro de datos en Europa. Por ejemplo OVHcloud VPS-2/VPS-3 o
+Hetzner Cloud (4 vCPU / 8 GB o más).
+
 Cuando te pida una clave SSH, pega tu clave pública (la línea que empieza por
-`ssh-ed25519`). Si no te la pide, no pasa nada: OVH te mandará por correo un
-usuario (`ubuntu`) y una contraseña.
+`ssh-ed25519`). En OVH, si no te la pide, te mandará por correo un usuario
+(`ubuntu`) y una contraseña.
 
 Apunta la **IP** del VPS. En esta guía sale como `IP_DEL_VPS`.
 
@@ -26,11 +29,13 @@ Apunta la **IP** del VPS. En esta guía sale como `IP_DEL_VPS`.
 En PowerShell:
 
 ```powershell
-ssh ubuntu@IP_DEL_VPS
+ssh ubuntu@IP_DEL_VPS     # OVH
+ssh root@IP_DEL_VPS       # Hetzner
 ```
 
 La primera vez pregunta si te fías del servidor: escribe `yes`. Si te pide
-contraseña, usa la del correo de OVH.
+contraseña, usa la del correo del proveedor. Si entraste como `root`, en el
+paso 3 puedes quitar `sudo` (no molesta si lo dejas).
 
 ## 3. Ejecutar el script
 
