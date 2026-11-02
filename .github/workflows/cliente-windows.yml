@@ -86,7 +86,9 @@ jobs:
           cmakeListsTxtPath: ${{ github.workspace }}/otclient/CMakeLists.txt
           configurePreset: windows-release
           buildPreset: windows-release
-          configurePresetAdditionalArgs: "['-DTOGGLE_BIN_FOLDER=ON', '-DOPTIONS_ENABLE_IPO=OFF', '-DOPTIONS_ENABLE_SCCACHE=OFF', '-DOTCLIENT_BUILD_TESTS=OFF']"
+          # Release (no RelWithDebInfo, que es lo que trae el preset): así el
+          # .exe se enlaza como aplicación de ventana y no abre la consola de logs.
+          configurePresetAdditionalArgs: "['-DCMAKE_BUILD_TYPE=Release', '-DTOGGLE_BIN_FOLDER=ON', '-DOPTIONS_ENABLE_IPO=OFF', '-DOPTIONS_ENABLE_SCCACHE=OFF', '-DOTCLIENT_BUILD_TESTS=OFF']"
 
       - name: Empaquetar (producción y pruebas)
         shell: pwsh
