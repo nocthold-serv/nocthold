@@ -226,7 +226,9 @@ jobs:
             if echo "$logs" | grep -q "server online!"; then
               if echo "$logs" | grep -q "\[NOCTHOLD\] OK"; then
                 echo "$logs" | grep "\[NOCTHOLD\]"
-                propios='monster/nocthold/|npc/nocthold_npcs|scripts/nocthold/|scripts/lib/nocthold'
+                # Errores en nuestros archivos. Un TalkAction que Canary no registra no dice el
+                # fichero, solo el comando ("TalkAction with name !nocthold ..."): también cuenta.
+                propios='monster/nocthold/|npc/nocthold_npcs|scripts/nocthold/|scripts/lib/nocthold|TalkAction with name [!/]nocthold'
                 if echo "$logs" | grep -E "$propios" | grep -iE "error|warn"; then
                   echo "::error::Hay avisos o errores en los archivos propios."
                   exit 1

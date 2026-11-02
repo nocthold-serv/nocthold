@@ -21,6 +21,11 @@ local function genericObject()
             local args = {...}
             local s = state[self]
             if key == "words" then s.words = args[1] end
+            if key == "groupType" then s.groupType = args[1] end
+            if key == "register" and s.talkAction then
+                -- Canary se niega a registrar un TalkAction sin groupType (solo lo dice en el log).
+                assert(s.groupType, "TalkAction " .. s.talkAction .. " sin groupType")
+            end
             if key == "register" then
                 if s.words then
                     assert(not registeredWords[s.words], "duplicate spell words: " .. tostring(s.words))
@@ -44,7 +49,7 @@ function Game.createNpcType(_) npcCount = npcCount + 1; return genericObject() e
 function Game.getSpectators() return {} end
 function CreatureEvent(_) return genericObject() end
 function GlobalEvent(_) return genericObject() end
-function TalkAction(_) return genericObject() end
+function TalkAction(words) local o = genericObject(); state[o].talkAction = words; return o end
 NpcHandler = setmetatable({}, { __index = function() return function() return genericObject() end end })
 KeywordHandler = setmetatable({}, { __index = function() return function() return genericObject() end end })
 FocusModule = setmetatable({}, { __index = function() return function() return genericObject() end end })
