@@ -56,6 +56,33 @@ dofile("data-nocthold/scripts/lib/nocthold.lua")
 local runtime = assert(loadfile("data-nocthold/scripts/nocthold/runtime/encounter_runtime.lua"))
 runtime()
 local U = NOCTHOLD_DUNGEON
+
+-- buildmap: igual que Canary, una casilla nueva no tiene suelo y rechaza objetos salvo con FLAG_NOLIMIT.
+FLAG_NOLIMIT = 1
+local fakeTiles = {}
+local function newTile(ground)
+    local t = { ground = ground }
+    function t:getGround() return self.ground end
+    function t:addItem(itemId, count, flags)
+        if not self.ground and (flags or 0) % 2 ~= FLAG_NOLIMIT then return nil end
+        self.ground = { getId = function() return itemId end }
+        return self.ground
+    end
+    return t
+end
+local function tileKey(p) return p.x .. ":" .. p.y .. ":" .. p.z end
+fakeTiles[tileKey(Position(100, 100, 7))] = newTile({ getId = function() return 406 end })
+function Tile(p) return fakeTiles[tileKey(p)] end
+function Game.createTile(p, dynamic)
+    local key = tileKey(p)
+    fakeTiles[key] = fakeTiles[key] or newTile(nil)
+    return fakeTiles[key]
+end
+function Game.createNpc(name, position) return { name = name } end
+assert(U.buildMap(fakePlayer) == true, "buildmap did not lay floor on groundless tiles")
+assert(U.mapReady, "buildmap did not mark the map as ready")
+assert(Tile(Position(64000, 64009, 7)):getGround():getId() == 406, "buildmap did not copy the floor under the GOD")
+
 U.mapReady = true
 U.nextKey[123] = 7
 assert(U.enter(fakePlayer) == true, "entry failed")
