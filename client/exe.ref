@@ -1,0 +1,11 @@
+# Release de la que se reutiliza el .exe ya compilado (vacío = compilar uno nuevo).
+#
+# Windows (SmartScreen / Smart App Control) se fía de un .exe sin firmar cuando
+# ya lo ha visto antes; cada compilación nueva cambia el fichero y vuelve a
+# bloquearlo. Mientras no firmemos el .exe, reutilizamos siempre el mismo y solo
+# cambiamos los ficheros de alrededor (init.lua, módulos...).
+#
+# Ese .exe se compiló con el commit de otclient.ref. Si cambias otclient.ref,
+# deja esto vacío para que se compile uno nuevo y, al publicarlo, pon aquí su
+# etiqueta.
+cliente-v0.1.0

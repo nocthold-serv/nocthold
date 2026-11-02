@@ -10,6 +10,7 @@ Por qué OTClient y no el cliente oficial de Tibia: el oficial no se puede redis
 |---|---|
 | Versión de OTClient que usamos (commit fijo) | [`otclient.ref`](otclient.ref) |
 | Lo que cambiamos al cliente (servidor, nombre) | [`configurar.py`](configurar.py) |
+| Release de la que se reutiliza el `.exe` (vacío = compilar) | [`exe.ref`](exe.ref) |
 | Instrucciones que van dentro del `.zip` | [`LEEME.txt`](LEEME.txt) |
 | Compilación y empaquetado | [`.github/workflows/cliente-windows.yml`](../.github/workflows/cliente-windows.yml) |
 
@@ -48,9 +49,11 @@ cd ~/nocthold/infra/canary
 
 Vocaciones: `knight`, `paladin`, `sorcerer`, `druid`, `monk` (por defecto knight). El personaje se copia del "Sample" de esa vocación (nivel 8, en el templo). El script genera la contraseña y la enseña una sola vez: pásasela al jugador por privado.
 
+**Siempre el mismo `.exe`.** Como el `.exe` no está firmado, Windows (Smart App Control y SmartScreen) bloquea o avisa con cada `.exe` nuevo que no ha visto antes. Por eso el workflow no compila: reutiliza el `.exe` de la release indicada en [`exe.ref`](exe.ref) y solo cambia los ficheros de alrededor. Cuando firmemos el `.exe` ya no hará falta.
+
 ## Actualizar OTClient
 
-Cambia el commit de `otclient.ref`, abre un PR y espera a que **Cliente Windows** salga en verde. Si OTClient cambia `init.lua` y `configurar.py` ya no encuentra lo que busca, el workflow falla en vez de sacar un cliente mal configurado.
+Cambia el commit de `otclient.ref`, vacía `exe.ref` para que se compile un `.exe` nuevo, abre un PR y espera a que **Cliente Windows** salga en verde. Si OTClient cambia `init.lua` y `configurar.py` ya no encuentra lo que busca, el workflow falla en vez de sacar un cliente mal configurado.
 
 ## Pendiente
 

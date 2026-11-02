@@ -52,6 +52,9 @@ jobs:
         run: |
           $ref = (Get-Content nocthold/client/otclient.ref | Where-Object { $_ -notmatch '^\s*(#|$)' } | Select-Object -First 1).Trim()
           "sha=$ref" >> $env:GITHUB_OUTPUT
+          # Release de la que reutilizamos el .exe (ver client/exe.ref)
+          $exeTag = (Get-Content nocthold/client/exe.ref | Where-Object { $_ -notmatch '^\s*(#|$)' } | Select-Object -First 1)
+          if ($exeTag) { "exe_tag=$($exeTag.Trim())" >> $env:GITHUB_OUTPUT }
 
       - name: Descargar OTClient Redemption
         uses: actions/checkout@v4
@@ -61,6 +64,7 @@ jobs:
           path: otclient
 
       - name: Versión de vcpkg
+        if: steps.ref.outputs.exe_tag == ''
         shell: pwsh
         run: |
           $json = Get-Content otclient/vcpkg.json -Raw | ConvertFrom-Json
@@ -68,6 +72,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path vcpkg-cache | Out-Null
 
       - name: Caché de vcpkg
+        if: steps.ref.outputs.exe_tag == ''
         uses: actions/cache@v4
         with:
           path: vcpkg-cache
@@ -75,12 +80,14 @@ jobs:
           restore-keys: vcpkg-win-
 
       - name: Preparar vcpkg
+        if: steps.ref.outputs.exe_tag == ''
         uses: lukka/run-vcpkg@v11
         with:
           vcpkgGitURL: "https://github.com/microsoft/vcpkg.git"
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
 
       - name: Compilar
+        if: steps.ref.outputs.exe_tag == ''
         uses: lukka/run-cmake@v10
         with:
           cmakeListsTxtPath: ${{ github.workspace }}/otclient/CMakeLists.txt
@@ -89,6 +96,20 @@ jobs:
           # Release (no RelWithDebInfo, que es lo que trae el preset): así el
           # .exe se enlaza como aplicación de ventana y no abre la consola de logs.
           configurePresetAdditionalArgs: "['-DCMAKE_BUILD_TYPE=Release', '-DTOGGLE_BIN_FOLDER=ON', '-DOPTIONS_ENABLE_IPO=OFF', '-DOPTIONS_ENABLE_SCCACHE=OFF', '-DOTCLIENT_BUILD_TESTS=OFF']"
+
+      - name: Reutilizar el .exe de la release ${{ steps.ref.outputs.exe_tag }}
+        if: steps.ref.outputs.exe_tag != ''
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.ref.outputs.exe_tag }}
+        run: |
+          gh release download $env:TAG --repo $env:GITHUB_REPOSITORY --pattern Nocthold-Windows.zip --dir exe-release
+          if ($LASTEXITCODE -ne 0) { throw "No puedo descargar Nocthold-Windows.zip de la release $env:TAG" }
+          Expand-Archive exe-release/Nocthold-Windows.zip -DestinationPath exe-release/zip
+          New-Item -ItemType Directory -Force -Path otclient/build/windows-release/bin | Out-Null
+          Copy-Item exe-release/zip/Nocthold/Nocthold.exe otclient/build/windows-release/bin/otclient.exe
+          (Get-FileHash otclient/build/windows-release/bin/otclient.exe).Hash
 
       - name: Empaquetar (producción y pruebas)
         shell: pwsh
