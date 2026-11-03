@@ -2,7 +2,8 @@
 -- Canary 3.6.1 Revscriptsys; values are first-pass balance and require in-game tuning.
 local spell = Spell("instant")
 spell:name("Frost Armor")
-spell:words("nocthold frost armor")
+spell:words("aeth glacis")
+spell:id(1028)
 spell:group("support")
 spell:cooldown(25000)
 spell:groupCooldown(1000)

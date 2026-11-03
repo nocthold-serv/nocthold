@@ -1,0 +1,36 @@
+{
+  "_leeme": "Descripción de cada hechizo para el jugador (sale en la lista de hechizos y al pasar el ratón por la barra de acciones). La clave es el nombre exacto de spell:name() en data-nocthold/scripts/nocthold/spells. Solo letras del español (tildes y ñ sí; nada de emojis ni comillas raras).",
+
+  "Shield Bash": "Golpeas con el escudo a un enemigo pegado a ti. Daño físico. El hechizo básico del Guardián.",
+  "Sundering Strike": "Un tajo fuerte a un enemigo cercano (hasta 5 casillas). Daño físico alto.",
+  "Iron Sweep": "Barres a todos los enemigos alrededor del objetivo con un golpe circular. Daño físico en área.",
+  "Taunting Roar": "Ruges y sacudes el suelo: poco daño físico al objetivo y a todos los que lo rodean.",
+  "Groundbreaker": "Partes el suelo bajo el objetivo y dañas a todos los que están cerca. Daño físico en área.",
+  "Fortress Stance": "Te plantas como una muralla: tu defensa con escudo sube un 25 % durante 6 segundos.",
+  "Intercept": "Te lanzas a cubrir huecos en la línea: tu velocidad sube mucho durante 6 segundos.",
+  "Bulwark": "Levantas el escudo con todo tu peso: tu defensa con escudo sube un 30 % durante 7 segundos.",
+  "Last Stand": "Aguantas hasta el final: tu vida máxima sube un 15 % durante 8 segundos.",
+  "Guardian's Oath": "Juras proteger al grupo: tu vida máxima sube un 10 % durante 8 segundos.",
+
+  "Verdant Touch": "Cura a un aliado o a ti mismo con savia viva. Curación rápida y barata.",
+  "Renewing Roots": "Unas raíces curan un poco al objetivo y siguen curándolo durante 8 segundos.",
+  "Purify": "Limpia la parálisis del objetivo y lo cura un poco.",
+  "Blooming Wave": "Una ola de flores cura al objetivo y a todos los que están a su alrededor.",
+  "Lifebloom": "Una flor se abre sobre el objetivo y lo va curando cada 2 segundos durante 10 segundos.",
+  "Spirit Bloom": "Los espíritus del bosque curan mucho al objetivo y a los que están a su alrededor.",
+  "Rebirth": "La curación más fuerte del Custodio, para salvar a un aliado en apuros. Tarda en volver a estar lista.",
+  "Thorn Lash": "Un látigo de espinas golpea al objetivo. Daño de tierra.",
+  "Nature's Grasp": "Las enredaderas atrapan al objetivo: poco daño y lo frenan durante 3 segundos.",
+  "Barkskin": "Tu piel se vuelve corteza: tu defensa con escudo sube un 30 % durante 7 segundos.",
+
+  "Arcane Bolt": "Un rayo de energía pura contra un enemigo a distancia. El hechizo básico del Arcanista.",
+  "Shatter": "Una esquirla de hielo golpea con fuerza a un enemigo. Daño de hielo.",
+  "Frost Lattice": "Una red de escarcha daña al objetivo y lo frena durante 2,5 segundos.",
+  "Prismatic Burst": "Un estallido de luz de colores daña al objetivo y a los que están a su alrededor.",
+  "Arcane Nova": "Una explosión de energía alrededor del objetivo. Daño en área.",
+  "Meteor": "Una roca ardiente cae del cielo sobre el objetivo y quema a todos los que están cerca.",
+  "Chain Lightning": "Un relámpago salta entre el objetivo y los enemigos de su alrededor.",
+  "Frost Armor": "Te cubres de hielo: tu vida máxima sube un 10 % durante 8 segundos.",
+  "Mana Ward": "Un escudo de energía te rodea: tu defensa con escudo sube un 30 % durante 7 segundos.",
+  "Arcane Surge": "La energía te empuja: tu velocidad sube mucho durante 6 segundos."
+}

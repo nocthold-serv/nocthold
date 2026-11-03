@@ -2,7 +2,8 @@
 -- Canary 3.6.1 Revscriptsys; values are first-pass balance and require in-game tuning.
 local spell = Spell("instant")
 spell:name("Bulwark")
-spell:words("nocthold bulwark")
+spell:words("stal gard")
+spell:id(1008)
 spell:group("support")
 spell:cooldown(25000)
 spell:groupCooldown(1000)

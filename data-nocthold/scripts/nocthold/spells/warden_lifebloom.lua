@@ -2,7 +2,8 @@
 -- Canary 3.6.1 Revscriptsys; values are first-pass balance and require in-game tuning.
 local spell = Spell("instant")
 spell:name("Lifebloom")
-spell:words("nocthold lifebloom")
+spell:words("sylva vira")
+spell:id(1015)
 spell:group("healing")
 spell:cooldown(18000)
 spell:groupCooldown(1000)

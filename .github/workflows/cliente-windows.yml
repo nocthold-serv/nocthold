@@ -3,7 +3,8 @@
 # Nocthold: el jugador descomprime, abre Nocthold.exe y solo pone correo y
 # contraseña. Ver client/README.md.
 #
-# - En cada PR o push que toque client/ (o este fichero): compila y deja los
+# - En cada PR o push que toque client/, los hechizos del servidor (el cliente
+#   saca de ellos su lista de hechizos) o este fichero: compila y deja los
 #   .zip como "artifact" del run (se descargan desde la pestaña Actions).
 # - Al crear una etiqueta cliente-vX.Y.Z: además publica una Release con los
 #   .zip, que es el enlace que se da a los jugadores.
@@ -15,12 +16,14 @@ on:
   pull_request:
     paths:
       - "client/**"
+      - "data-nocthold/scripts/nocthold/spells/**"
       - ".github/workflows/cliente-windows.yml"
   push:
     branches: [develop]
     tags: ["cliente-v*"]
     paths:
       - "client/**"
+      - "data-nocthold/scripts/nocthold/spells/**"
       - ".github/workflows/cliente-windows.yml"
 
 concurrency:
@@ -44,7 +47,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: nocthold
-          sparse-checkout: client
+          sparse-checkout: |
+            client
+            data-nocthold/scripts/nocthold/spells
 
       - name: Leer la versión fijada de OTClient
         id: ref

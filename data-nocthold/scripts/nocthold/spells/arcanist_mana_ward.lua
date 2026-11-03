@@ -2,7 +2,8 @@
 -- Canary 3.6.1 Revscriptsys; values are first-pass balance and require in-game tuning.
 local spell = Spell("instant")
 spell:name("Mana Ward")
-spell:words("nocthold ward")
+spell:words("aeth custos")
+spell:id(1029)
 spell:group("support")
 spell:cooldown(30000)
 spell:groupCooldown(1000)
