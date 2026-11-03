@@ -30,6 +30,8 @@ private:
 
 	static int luaMonsterIsIdle(lua_State* L);
 	static int luaMonsterSetIdle(lua_State* L);
+	static int luaMonsterIsDormant(lua_State* L);
+	static int luaMonsterSetDormant(lua_State* L);
 
 	static int luaMonsterIsTarget(lua_State* L);
 	static int luaMonsterIsOpponent(lua_State* L);
