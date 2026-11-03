@@ -100,6 +100,20 @@ class Plano(unittest.TestCase):
         })
         self.assertEqual(info["suelos"], 12)  # los monstruos van sobre suelo normal
 
+    def test_portales(self):
+        m, info = generar(plano("ES.T\n..K.\n", **{"destino S": "templo", "destino T": "jefe1", "punto K": "jefe1"}))
+        salida = m.tiles[(1001, 1000, 7)].items
+        self.assertEqual(salida, [otbm.Item(gm.PORTAL, aid=gm.AID_TEMPLO)])
+        self.assertEqual(m.tiles[(1003, 1000, 7)].items, [otbm.Item(gm.PORTAL, (1002, 1001, 7))])
+        self.assertEqual(info["portales"], [(1001, 1000, 7, "templo"), (1003, 1000, 7, (1002, 1001, 7))])
+        self.assertEqual(info["paredes"], 16)  # los portales no cuentan como pared
+        leido = otbm.read(otbm.write(m))
+        self.assertEqual(leido.tiles, m.tiles)
+        _, info = generar(plano("ET\n", **{"destino T": "100 200 7"}))
+        self.assertEqual(info["portales"], [(1001, 1000, 7, (100, 200, 7))])
+        with self.assertRaises(gm.ErrorPlano):
+            generar(plano("ET\n", **{"destino T": "a ninguna parte"}))
+
     def test_puntos_repetidos_y_letras(self):
         _, info = generar(plano("EJJ1N\n"))
         self.assertEqual([p for p, *_ in info["puntos"]], ["entrada", "jefe", "jefe2", "1", "n"])

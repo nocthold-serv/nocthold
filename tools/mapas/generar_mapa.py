@@ -17,7 +17,8 @@ Leyenda del plano (una letra = una casilla; ver README.md):
     .   suelo                 #  pared               +  puerta (dentro de una pared)
     P   suelo en zona protegida (no se puede atacar)
     E   entrada (obligatoria, una sola)              J  jefe
-    1-9 y otras mayúsculas: suelo con un punto con nombre para los scripts ("punto K: jefe1" le da nombre)
+    1-9 y otras mayúsculas: suelo con un punto con nombre para los scripts ("punto K: jefe1" le da nombre;
+                            "destino K: templo", "destino K: jefe1" o "destino K: X Y Z" lo convierte en portal)
     a-z (minúsculas): un monstruo del grupo (pull) de esa letra; "grupo a: Nombre" dice cuál
                       y "radio a: 4" el radio de aggro (si no, lo decide el script de aggro)
     espacio o ~: nada
@@ -40,6 +41,11 @@ PLANOS = os.path.join(AQUI, "planos")
 SALIDA_MAPAS = os.path.join(RAIZ, "data-nocthold", "world", "custom")
 SALIDA_LUA = os.path.join(RAIZ, "data-nocthold", "scripts", "lib", "nocthold_mapas.lua")
 
+# Portales: campo mágico (magic forcefield). Con "destino X: templo" lleva el action id que usa
+# data-nocthold/scripts/nocthold/mapas_portales.lua para mandar al templo del jugador.
+PORTAL = 1949
+AID_TEMPLO = 45200
+
 # Zona reservada para la sala que construye "!nocthold buildmap" (encounter_runtime.lua).
 ZONA_BUILDMAP = (64000, 64000, 64080, 64030, 7)
 
@@ -61,7 +67,7 @@ def cargar_materiales():
 
 def leer_plano(texto, origen_fichero="plano"):
     """Devuelve (opciones, filas) de un plano. Lanza ErrorPlano con la línea del fallo."""
-    opciones = {"paredes_auto": "si", "grupos": {}, "radios": {}, "puntos": {}}
+    opciones = {"paredes_auto": "si", "grupos": {}, "radios": {}, "puntos": {}, "destinos": {}}
     filas = None
     for numero, linea in enumerate(texto.splitlines(), start=1):
         if filas is not None:
@@ -80,6 +86,12 @@ def leer_plano(texto, origen_fichero="plano"):
             filas = []
             continue
         partes = clave.split()
+        if len(partes) == 2 and partes[0] == "destino":
+            letra = linea.split(":", 1)[0].split()[1]
+            if len(letra) != 1 or not (letra.isdigit() or "A" <= letra <= "Z") or letra in "EP":
+                raise ErrorPlano(f"{origen_fichero}:{numero}: 'destino' es para una mayúscula o un número del plano (destino S: templo)")
+            opciones["destinos"][letra] = valor
+            continue
         if len(partes) == 2 and partes[0] == "punto":
             letra = linea.split(":", 1)[0].split()[1]
             if len(letra) != 1 or not (letra.isdigit() or "A" <= letra <= "Z") or letra in "EP":
@@ -206,6 +218,7 @@ def generar(opciones, filas, materiales, origen_fichero="plano"):
     puntos = []
     contadores = {}
     grupos = {}  # letra -> [(x, y, z), ...]
+    marcas = {}  # mayúscula o número -> [(x, y), ...] (para los portales)
     for (c, f) in sorted(celdas, key=lambda k: (k[1], k[0])):
         ch = celdas[(c, f)]
         x, y = ox + c, oy + f
@@ -229,6 +242,7 @@ def generar(opciones, filas, materiales, origen_fichero="plano"):
         elif "a" <= ch <= "z":
             grupos.setdefault(ch, []).append((x, y, oz))
         elif ch != ".":
+            marcas.setdefault(ch, []).append((x, y))
             base = opciones.get("puntos", {}).get(ch) or {"E": "entrada", "J": "jefe"}.get(ch, ch.lower())
             contadores[base] = contadores.get(base, 0) + 1
             punto = base if contadores[base] == 1 else f"{base}{contadores[base]}"
@@ -237,6 +251,28 @@ def generar(opciones, filas, materiales, origen_fichero="plano"):
 
     if contadores.get("entrada", 0) != 1:
         raise ErrorPlano(f"{origen_fichero}: el plano tiene que tener exactamente una E (entrada); tiene {contadores.get('entrada', 0)}")
+
+    nombres = {p: (x, y, z) for p, x, y, z in puntos}
+    portales = []
+    for letra, valor in sorted(opciones.get("destinos", {}).items()):
+        if letra not in marcas:
+            raise ErrorPlano(f"{origen_fichero}: hay 'destino {letra}:' pero ninguna '{letra}' en el dibujo")
+        partes_destino = valor.replace(",", " ").split()
+        if valor.strip().lower() == "templo":
+            destino = "templo"
+        elif len(partes_destino) == 3 and all(p.isdigit() for p in partes_destino):
+            destino = tuple(int(p) for p in partes_destino)
+        elif valor.strip().lower() in nombres:
+            destino = nombres[valor.strip().lower()]
+        else:
+            raise ErrorPlano(f"{origen_fichero}: 'destino {letra}: {valor}' no es 'templo', ni X Y Z, "
+                             f"ni un punto de este mapa ({', '.join(sorted(nombres))})")
+        for x, y in marcas[letra]:
+            if destino == (x, y, oz):
+                raise ErrorPlano(f"{origen_fichero}: el portal '{letra}' te manda a su propia casilla")
+            item = otbm.Item(PORTAL, aid=AID_TEMPLO) if destino == "templo" else otbm.Item(PORTAL, destino)
+            m.tiles[(x, y, oz)].items.append(item)
+            portales.append((x, y, oz, destino))
 
     for clave in ("grupos", "radios"):
         for letra in opciones.get(clave, {}):
@@ -254,10 +290,15 @@ def generar(opciones, filas, materiales, origen_fichero="plano"):
         "grupos": {letra: {"monstruo": opciones.get("grupos", {}).get(letra), "radio": opciones.get("radios", {}).get(letra),
                            "posiciones": grupos[letra]}
                    for letra in sorted(grupos)},
-        "suelos": sum(1 for t in m.tiles.values() if not t.items),
-        "paredes": sum(1 for t in m.tiles.values() if t.items),
+        "portales": portales,
+        "suelos": sum(1 for t in m.tiles.values() if not t.items or _es_portal(t.items[0])),
+        "paredes": sum(1 for t in m.tiles.values() if t.items and not _es_portal(t.items[0])),
     }
     return m, info
+
+
+def _es_portal(item):
+    return otbm.item_id(item) == PORTAL
 
 
 def _solapan(a, b):
@@ -283,8 +324,11 @@ def lua_de(mapas):
         "-- automática (selftest.lua), lo que tiene que haber en cada casilla: {x, y, suelo, objeto o 0, zona protegida}.",
         "-- grupos: cada letra minúscula del plano es un grupo de monstruos (un pull); posiciones = dónde va cada uno.",
         "",
+        "-- Se suma a Nocthold.mapas (puede haber otro fichero igual con mapas que no están en el repositorio).",
+        "",
         "Nocthold = Nocthold or {}",
-        "Nocthold.mapas = {",
+        "Nocthold.mapas = Nocthold.mapas or {}",
+        "for nombre, mapa in pairs({",
     ]
     for m, info in mapas:
         x1, y1, x2, y2, z = info["caja"]
@@ -293,6 +337,11 @@ def lua_de(mapas):
         lineas.append("\t\tpuntos = {")
         for p, x, y, zz in info["puntos"]:
             lineas.append(f'\t\t\t["{p}"] = {{{x}, {y}, {zz}}},')
+        lineas.append("\t\t},")
+        lineas.append("\t\tportales = {")
+        for x, y, zz, destino in info["portales"]:
+            d = '"templo"' if destino == "templo" else f"{{{destino[0]}, {destino[1]}, {destino[2]}}}"
+            lineas.append(f"\t\t\t{{{x}, {y}, {zz}, destino = {d}}},")
         lineas.append("\t\t},")
         lineas.append("\t\tgrupos = {")
         for letra, g in info["grupos"].items():
@@ -305,10 +354,13 @@ def lua_de(mapas):
         for key in sorted(m.tiles, key=lambda k: (k[1], k[0])):
             t = m.tiles[key]
             pz = "true" if t.flags & otbm.FLAG_PROTECTIONZONE else "false"
-            lineas.append(f"\t\t\t{{{t.x}, {t.y}, {t.ground}, {t.items[0] if t.items else 0}, {pz}}},")
+            objeto = otbm.item_id(t.items[0]) if t.items and not _es_portal(t.items[0]) else 0
+            lineas.append(f"\t\t\t{{{t.x}, {t.y}, {t.ground}, {objeto}, {pz}}},")
         lineas.append("\t\t},")
         lineas.append("\t},")
-    lineas.append("}")
+    lineas.append("}) do")
+    lineas.append("\tNocthold.mapas[nombre] = mapa")
+    lineas.append("end")
     return ("\n".join(lineas) + "\n").encode()
 
 
@@ -349,7 +401,7 @@ def main(argv=None):
     salida_mapas, salida_lua = SALIDA_MAPAS, SALIDA_LUA
     if args.salida:
         salida_mapas = os.path.abspath(args.salida)
-        salida_lua = os.path.join(salida_mapas, "nocthold_mapas.lua")
+        salida_lua = os.path.join(salida_mapas, "nocthold_mapas_privados.lua")
     try:
         mapas, salida = generar_todo(os.path.abspath(args.planos) if args.planos else PLANOS, salida_mapas, salida_lua)
     except ErrorPlano as e:

@@ -4,7 +4,7 @@
 --
 -- Qué comprueba, con el motor de Canary de verdad:
 --   constantes usadas por los scripts, los 7 monstruos, los 30 hechizos (nombre y palabras),
---   los comandos /nocthold y !nocthold, los mapas generados (tools/mapas) casilla a casilla,
+--   los comandos /nocthold y !nocthold, los mapas generados (tools/mapas) casilla a casilla y sus portales,
 --   la sala de buildmap casilla a casilla, los 5 NPC,
 --   y una expedición entera de llave 7 (6 fases, afijos, refuerzos de jefe, muertes,
 --   mejora de llave, salida y limpieza) con un jugador simulado.
@@ -150,6 +150,30 @@ local function checkGeneratedMaps()
 				floors = floors + 1
 			end
 		end
+		-- Portales del plano: campo mágico con su destino, o con el action id que lleva al templo.
+		for _, p in ipairs(mapa.portales or {}) do
+			local where = "mapa " .. name .. ": portal " .. p[1] .. "," .. p[2] .. "," .. p[3]
+			local tile = Tile(Position(p[1], p[2], p[3]))
+			local portal = tile and tile:getItemById(NOCTHOLD_MAPAS.ITEM_PORTAL)
+			if check(portal ~= nil, where .. " no está") then
+				if p.destino == "templo" then
+					check(portal:getActionId() == NOCTHOLD_MAPAS.AID_TEMPLO, where .. ": no lleva el action id del templo")
+				else
+					-- Canary da a los teletransportes la clase Teleport, que tiene getDestination().
+					local d = portal.getDestination and portal:getDestination()
+					check(d and d.x == p.destino[1] and d.y == p.destino[2] and d.z == p.destino[3], where .. ": destino distinto del plano")
+				end
+			end
+		end
+		-- Portal del templo hacia la entrada del mapa (mapas_portales.lua).
+		local fromTown
+		for aid, portal in pairs(NOCTHOLD_MAPAS.portales) do
+			if portal.nombre == name then
+				local item = Tile(portal.desde) and Tile(portal.desde):getItemById(NOCTHOLD_MAPAS.ITEM_PORTAL)
+				fromTown = item and item:getActionId() == aid
+			end
+		end
+		check(fromTown, "mapa " .. name .. ": no hay portal junto al templo")
 		if check(bad == 0, "mapa " .. name .. ": " .. bad .. " casillas no coinciden con el plano (la primera, " .. tostring(first) .. ")") then
 			check(floors == mapa.suelos and walls == mapa.paredes, "mapa " .. name .. ": cuenta de casillas distinta")
 			logger.info("[NOCTHOLD-TEST] Mapa generado " .. name .. ": " .. floors .. " suelos y " .. walls .. " paredes, todo como en el plano")
