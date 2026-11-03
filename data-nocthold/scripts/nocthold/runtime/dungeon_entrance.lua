@@ -99,6 +99,9 @@ end
 function U.useAltar(player)
 	local r = U.run
 	if r then
+		if U.godReset and U.godReset(player) then
+			return false
+		end
 		if r.players[player:getGuid()] then
 			tell(player, "Tu expedición ya está en marcha. Cruza la barrera del pasillo para volver.")
 		else

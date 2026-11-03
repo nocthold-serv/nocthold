@@ -4,7 +4,7 @@
 --
 -- Qué comprueba, con el motor de Canary de verdad:
 --   constantes usadas por los scripts, los 7 monstruos, los 30 hechizos (nombre y palabras),
---   el comando /nocthold (y que ya no existe !nocthold), los mapas generados (tools/mapas)
+--   que no queda ningún comando (!nocthold ni /nocthold), los mapas generados (tools/mapas)
 --   casilla a casilla, la sala de La Forja Caída casilla a casilla, los 5 NPC, el portal del
 --   templo, el altar, la barrera y el portal de salida, una piedra-llave de verdad,
 --   y una expedición entera de llave 7 empezada desde el altar (6 fases, afijos, refuerzos de
@@ -113,10 +113,12 @@ local function staticChecks()
 		end
 	end
 
-	-- Comandos: solo el de GOD. Los jugadores no usan ninguno.
+	-- Comandos: ninguno. Todo va con objetos, NPC y portales.
 	local talk = Game.getTalkActions()
-	check(talk["!nocthold"] == nil, "el comando !nocthold de jugador debería haber desaparecido")
-	check(talk["/nocthold"] ~= nil, "el comando /nocthold no está registrado")
+	check(talk["!nocthold"] == nil, "el comando !nocthold debería haber desaparecido")
+	check(talk["/nocthold"] == nil, "el comando /nocthold debería haber desaparecido")
+	local wandType = ItemType(Nocthold.GOD_WAND)
+	check(wandType:getId() == Nocthold.GOD_WAND and wandType:isPickupable(), "la vara de pruebas (" .. Nocthold.GOD_WAND .. ") no existe o no se puede coger")
 
 	-- Objetos de la entrada: existen y son lo que creemos.
 	local key = ItemType(U.ITEM_KEY)
@@ -243,9 +245,9 @@ local function buildArena()
 	end
 
 	-- Cada monstruo se puede crear en la sala (nombres con tilde incluidos), y el golpe de
-	-- prueba (/nocthold golpe) mata a los normales de un golpe y quita un 25 % a los 3 jefes.
+	-- prueba (vara de pruebas del GOD) mata a los normales de un golpe y quita un 25 % a los 3 jefes.
 	local tester = { isPlayer = function() return true end, getGuid = function() return fake.guid end }
-	Nocthold.testDamage[fake.guid] = true
+	check(Nocthold.toggleTestDamage(fake, fake) == true, "la vara de pruebas no activa el golpe")
 	local bosses = 0
 	for _, name in ipairs(Nocthold.monsters) do
 		local monster = Game.createMonster(Nocthold.latin1(name), arenaPos(70, 15), true, true)
@@ -259,7 +261,7 @@ local function buildArena()
 			monster:remove()
 		end
 	end
-	Nocthold.testDamage[fake.guid] = nil
+	check(Nocthold.toggleTestDamage(fake, fake) == false and not Nocthold.testDamage[fake.guid], "la vara de pruebas no quita el golpe")
 	check(bosses == 3, "deberían ser 3 jefes, son " .. bosses)
 end
 

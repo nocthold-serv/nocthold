@@ -69,7 +69,7 @@ function CreatureEvent(_) return genericObject() end
 function GlobalEvent(_) return genericObject() end
 function MoveEvent() return genericObject() end
 function Action() return genericObject() end
-function TalkAction(words) local o = genericObject(); state[o].talkAction = words; return o end
+function TalkAction(words) error("no commands allowed: TalkAction(" .. tostring(words) .. ")") end
 NpcHandler = setmetatable({}, { __index = function() return function() return genericObject() end end })
 KeywordHandler = setmetatable({}, { __index = function() return function() return genericObject() end end })
 FocusModule = setmetatable({}, { __index = function() return function() return genericObject() end end })
@@ -95,7 +95,7 @@ assert(loadfile(root .. "/npc/nocthold_npcs.lua"))()
 assert(npcCount == 5, "Expected five NpcType registrations, got " .. npcCount)
 assert(loadfile(root .. "/scripts/nocthold/runtime/encounter_runtime.lua"))()
 assert(loadfile(root .. "/scripts/nocthold/runtime/dungeon_entrance.lua"))()
-assert(loadfile(root .. "/scripts/nocthold/nocthold_admin.lua"))()
+assert(loadfile(root .. "/scripts/nocthold/god_tools.lua"))()
 assert(loadfile(root .. "/scripts/nocthold/test_damage.lua"))()
 do
     local flagged = { isPlayer = function() return true end, getGuid = function() return 55 end }
@@ -103,12 +103,14 @@ do
     local function monster(boss)
         return { getMaxHealth = function() return 1000 end, getType = function() return { isRewardBoss = function() return boss end } end }
     end
-    Nocthold.testDamage[55] = true
+    flagged.getName = function() return "Probador" end
+    flagged.sendTextMessage = function() return true end
+    assert(Nocthold.toggleTestDamage(flagged, flagged) == true, "the GOD wand must turn test damage on")
     assert(Nocthold.testDamageFor(monster(false), flagged) == 1000, "test damage must one-shot normal monsters")
     assert(Nocthold.testDamageFor(monster(true), flagged) == 250, "test damage must take 25% from bosses")
     assert(Nocthold.testDamageFor(monster(false), other) == nil, "test damage only for flagged players")
     assert(Nocthold.testDamageFor(monster(false), nil) == nil, "test damage without attacker")
-    Nocthold.testDamage[55] = nil
+    assert(Nocthold.toggleTestDamage(flagged, flagged) == false and not Nocthold.testDamage[55], "the GOD wand must turn test damage off")
 end
 local monsters = Nocthold.countMonsters()
 assert(monsters == 7, "Nocthold.countMonsters() = " .. monsters)

@@ -13,11 +13,11 @@ se actualice, no hay que fusionar una copia entera de `data-canary`.
 |---|---|---|
 | `monster/nocthold/` | 7 monstruos (4 normales y 3 jefes con fases: al 70 % y al 35 % de vida llaman refuerzos) | Dan oro; sin experiencia todavía. Aspecto provisional. |
 | `npc/nocthold_npcs.lua` | 5 NPC con diálogo | Se colocan solos al arrancar. El Cronista de Llaves da la piedra-llave y la Archivista dice el estado. |
-| `scripts/nocthold/spells/` | 30 hechizos: Guardian (knight), Warden (druid) y Arcanist (sorcerer) | Se lanzan con `nocthold <palabra>` (lista: `/nocthold spells`). Balance sin ajustar. |
+| `scripts/nocthold/spells/` | 30 hechizos: Guardian (knight), Warden (druid) y Arcanist (sorcerer) | Se lanzan con `nocthold <palabra>`. Balance sin ajustar. |
 | `scripts/nocthold/runtime/` | La Forja Caída: 6 encuentros, llaves 0-10, cronómetro y recompensa en oro. `dungeon_entrance.lua`: portal, altar, piedra-llave, barrera y salidas | Una sola arena compartida (un grupo a la vez); la expedición en curso se pierde al reiniciar (la piedra-llave no). |
-| `scripts/lib/nocthold.lua` | Lista de lo que debe cargarse y `Nocthold.latin1()` | Lo usan el aviso de arranque y `/nocthold status`. |
+| `scripts/lib/nocthold.lua` | Lista de lo que debe cargarse y `Nocthold.latin1()` | Lo usa el aviso de arranque. |
 | `scripts/nocthold/nocthold_startup.lua` | Al arrancar escribe `[NOCTHOLD] OK ...` en el log | La comprobación de GitHub busca esa línea. |
-| `scripts/nocthold/nocthold_admin.lua` | `/nocthold status`, `spells`, `golpe`, `mapa`, `forja`, `llave` y `reset` (solo god) | `/nocthold mapa [nombre]` lleva al GOD a la entrada de un mapa generado. |
+| `scripts/nocthold/god_tools.lua` | Herramientas de prueba del GOD sin comandos: vara de pruebas y vaciar la mazmorra desde el altar | No hay ningún comando, ni para jugadores ni para GOD. |
 | `world/custom/` | Mapas `.otbm` generados con `tools/mapas/generar_mapa.py` a partir de planos de letras | Canary los carga solos al arrancar. De momento, `sala_prueba` (X 63999-64017, Y 64099-64116, piso 7). |
 | `scripts/lib/nocthold_mapas.lua` | Lista de mapas generados, sus puntos y lo que hay en cada casilla | GENERADO: no editar a mano. |
 
@@ -42,8 +42,9 @@ Los jugadores no escriben ningún comando: todo está en el mapa.
 7. Si nadie de la expedición está dentro durante 3 minutos, la sala se libera.
 8. Desde la llave 4 sale un Sabueso más en cada grupo; desde la 7, un Coloso más con el jefe final.
 
-Para probar como GOD: `/nocthold forja` (ir a la entrada), `/nocthold llave 7` (piedra-llave en
-tu mochila) y `/nocthold reset` (vaciar la mazmorra). El GOD cruza la barrera siempre.
+Para probar como GOD tampoco hay comandos: entra por el mismo portal, pide la piedra-llave al
+Cronista como cualquiera, cruzas la barrera siempre y, si usas el altar con una expedición en
+marcha, la mazmorra se vacía (monstruos fuera y jugadores a la entrada).
 
 Tests sin servidor: `luajit tests/lua/test_nocthold_datapack.lua` y `luajit tests/lua/test_nocthold_dungeon.lua`.
 
@@ -52,10 +53,11 @@ tablas SQL) no está en este repositorio, que es público.
 
 ### Golpe de prueba (solo GOD)
 
-`/nocthold golpe <jugador>` (o sin nombre, para ti) activa o quita el golpe de prueba: ese
-jugador mata de un golpe a los monstruos de Nocthold y a los jefes les quita un 25 % por
-golpe (4 golpes, para ver sus fases). No cambia ningún objeto ni a ningún otro monstruo y
-se borra al reiniciar el servidor.
+Todo GOD recibe al entrar al juego una **vara de pruebas** (una palanca) en la mochila. Usarla
+sobre un jugador le activa o le quita el golpe de prueba; usarla sin más, al propio GOD. Con el
+golpe activo, ese jugador mata de un golpe a los monstruos de Nocthold y a los jefes les quita
+un 25 % por golpe (4 golpes, para ver sus fases). No cambia ningún otro monstruo y se borra al
+reiniciar el servidor. Si la vara acaba en manos de alguien que no es GOD, desaparece al usarla.
 
 ## Cómo se usa
 
@@ -80,7 +82,7 @@ nuestros archivos.
 Además, en ese mismo arranque se activa `scripts/nocthold/selftest.lua` (solo con
 `NOCTHOLD_SELFTEST=1`, que pone GitHub Actions; en pruebas y producción no hace nada).
 Dentro del servidor real comprueba las constantes que usamos, los 30 hechizos por nombre y
-palabras, que solo existe el comando de GOD, la sala casilla a casilla, los 5 NPC, el portal
+palabras, que no queda ningún comando, la sala casilla a casilla, los 5 NPC, el portal
 del templo, el altar, la barrera y los portales, una piedra-llave de verdad, crea los 7
 monstruos y juega una llave 7 entera empezada desde el altar (6 fases, afijos, refuerzos,
 portal final, salida y limpieza). Tiene que terminar en `[NOCTHOLD-TEST] TODO OK`. Lanzar hechizos, hablar con
