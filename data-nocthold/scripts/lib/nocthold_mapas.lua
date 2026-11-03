@@ -1,6 +1,7 @@
 -- GENERADO por tools/mapas/generar_mapa.py: no lo edites a mano (cambia el plano y vuelve a generar).
 -- Mapas de data-nocthold/world/custom/ hechos con el generador: puntos con nombre y, para la prueba
 -- automática (selftest.lua), lo que tiene que haber en cada casilla: {x, y, suelo, objeto o 0, zona protegida}.
+-- grupos: cada letra minúscula del plano es un grupo de monstruos (un pull); posiciones = dónde va cada uno.
 
 Nocthold = Nocthold or {}
 Nocthold.mapas = {
@@ -10,6 +11,8 @@ Nocthold.mapas = {
 			["entrada"] = {64003, 64101, 7},
 			["1"] = {64003, 64107, 7},
 			["jefe"] = {64011, 64114, 7},
+		},
+		grupos = {
 		},
 		casillas = {
 			{63999, 64099, 429, 1296, false},

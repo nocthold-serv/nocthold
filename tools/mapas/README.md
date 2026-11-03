@@ -34,12 +34,24 @@ puntos para los jefes) y después se decora a mano en el RME.
 | `P` | suelo en zona protegida (no se puede atacar) |
 | `E` | entrada (obligatoria, solo una) |
 | `J` | jefe (si hay varias: `jefe`, `jefe2`...) |
-| `1` a `9` y otras mayúsculas | suelo con un punto con nombre (`1`, `2`... `n`) para los scripts |
+| `1` a `9` y otras mayúsculas | suelo con un punto con nombre (`1`, `2`... `k`) para los scripts |
+| `a` a `z` (minúsculas) | un monstruo del grupo (pull) de esa letra: todas las `c` son el grupo `c` |
 | espacio o `~` | nada |
 
 Con `paredes_auto: si` (lo normal) no hace falta dibujar paredes: toda casilla vacía que toca
 un suelo (también en diagonal) se convierte en pared. Las paredes se orientan solas
 (horizontal, vertical, esquina o poste) con las mismas reglas que el pincel del RME.
+
+Opciones de grupos y puntos (encima de `plano:`):
+
+```
+grupo c: Sabueso de Ceniza   # qué monstruo va en las casillas 'c'
+radio c: 4                   # radio de aggro del grupo, en casillas (1-15; si no, el de por defecto)
+punto K: jefe1               # nombre del punto marcado con 'K' (si no, se llama 'k')
+```
+
+Los grupos se guardan en `nocthold_mapas.lua` (`grupos[letra] = {monstruo, radio, posiciones}`)
+para que el script de aggro cree los monstruos y su zona invisible. El `.otbm` no lleva monstruos.
 
 Los puntos quedan en el mapa como *waypoints* con el nombre `<mapa>.<punto>`, por ejemplo
 `sala_prueba.jefe`. Desde Lua: `getWaypointPositionByName("sala_prueba.jefe")`.
@@ -51,6 +63,14 @@ comprueba con `data/items/appearances.dat` que los suelos son suelo y las parede
 
 - Suelos: `piedra gris`, `piedra`, `marmol negro`, `adoquin marron`, `tierra de cueva` (mezcla piezas).
 - Paredes: `piedra` (con puertas), `roca`, `piedra clara`.
+
+## Diseños que no van al repositorio
+
+El repositorio es público. Para un diseño propio, guarda los planos en otra carpeta y genera allí:
+
+```
+python3 tools/mapas/generar_mapa.py --planos MI_CARPETA_DE_PLANOS --salida MI_CARPETA_DE_MAPAS
+```
 
 ## Qué genera
 
