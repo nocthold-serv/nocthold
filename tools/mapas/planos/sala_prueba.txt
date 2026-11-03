@@ -1,0 +1,27 @@
+# Plano de prueba del generador de mapas de Nocthold.
+# Una sala genérica para probar el programa: no es el diseño de ninguna mazmorra.
+# Qué significa cada letra: tools/mapas/README.md
+
+nombre: sala_prueba
+origen: 64000 64100 7
+suelo: piedra gris
+pared: piedra
+paredes_auto: si
+
+plano:
+PPPPPPP
+PPPEPPP
+PPPPPPP
+###+###
+   .
+   .
+.......
+...1...
+.......
+   .
+   ..........
+            .
+      ...........
+      ...........
+      .....J.....
+      ...........

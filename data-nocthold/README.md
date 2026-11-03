@@ -17,7 +17,9 @@ se actualice, no hay que fusionar una copia entera de `data-canary`.
 | `scripts/nocthold/runtime/` | La Forja Caída: 6 encuentros, llaves 0-10, cronómetro y recompensa en oro | Una sola arena compartida (un grupo a la vez); el estado se pierde al reiniciar. |
 | `scripts/lib/nocthold.lua` | Lista de lo que debe cargarse y `Nocthold.latin1()` | Lo usan el aviso de arranque y `/nocthold status`. |
 | `scripts/nocthold/nocthold_startup.lua` | Al arrancar escribe `[NOCTHOLD] OK ...` en el log | La comprobación de GitHub busca esa línea. |
-| `scripts/nocthold/nocthold_admin.lua` | `/nocthold status` y `/nocthold spells` (solo god) | Solo lee. |
+| `scripts/nocthold/nocthold_admin.lua` | `/nocthold status`, `spells`, `golpe` y `mapa` (solo god) | `/nocthold mapa [nombre]` lleva al GOD a la entrada de un mapa generado. |
+| `world/custom/` | Mapas `.otbm` generados con `tools/mapas/generar_mapa.py` a partir de planos de letras | Canary los carga solos al arrancar. De momento, `sala_prueba` (X 63999-64017, Y 64099-64116, piso 7). |
+| `scripts/lib/nocthold_mapas.lua` | Lista de mapas generados, sus puntos y lo que hay en cada casilla | GENERADO: no editar a mano. |
 
 ### Probar la mazmorra
 
@@ -72,6 +74,6 @@ NPC y las fases de los jefes por vida necesitan un jugador conectado: eso lo pru
 - Experiencia de los monstruos, botín de verdad y aspectos (lookType) e IDs a partir de los assets del cliente 15.25.
 - Ajustar el daño y la curación de los 30 hechizos jugando.
 - Mazmorra instanciada (varios grupos a la vez), escalado de vida y daño por llave, y guardar llaves y ranking en la base de datos.
-- Mapa propio `.otbm` en RME (ahora la mazmorra es una sala generada al vuelo).
+- Mapa propio `.otbm`: ya hay un generador de planos de letras (`tools/mapas/`, ver su README); falta dibujar la mazmorra de verdad, decorarla en el RME y que el script la use en vez de la sala de `buildmap`.
 - Talentos, equipo y misiones: solo existen en el diseño.
 - Acentos y ñ: los textos para el jugador pasan por `Nocthold.latin1()` (el cliente lee Latin-1). Úsalo en todo texto nuevo con tildes.

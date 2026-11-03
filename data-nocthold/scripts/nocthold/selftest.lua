@@ -4,7 +4,8 @@
 --
 -- Qué comprueba, con el motor de Canary de verdad:
 --   constantes usadas por los scripts, los 7 monstruos, los 30 hechizos (nombre y palabras),
---   los comandos /nocthold y !nocthold, la sala de buildmap casilla a casilla, los 5 NPC,
+--   los comandos /nocthold y !nocthold, los mapas generados (tools/mapas) casilla a casilla,
+--   la sala de buildmap casilla a casilla, los 5 NPC,
 --   y una expedición entera de llave 7 (6 fases, afijos, refuerzos de jefe, muertes,
 --   mejora de llave, salida y limpieza) con un jugador simulado.
 -- Lo que NO puede probar sin un cliente conectado: lanzar los hechizos, hablar con los NPC
@@ -56,8 +57,9 @@ local constants = {
 	"CONDITION_PARAM_TICKS", "CONDITION_REGENERATION", "CONST_ME_BLOCKHIT", "CONST_ME_ENERGYHIT",
 	"CONST_ME_EXPLOSIONHIT", "CONST_ME_FIREAREA", "CONST_ME_GREEN_RINGS", "CONST_ME_GROUNDSHAKER",
 	"CONST_ME_HITAREA", "CONST_ME_HOLYDAMAGE", "CONST_ME_ICEATTACK", "CONST_ME_MAGIC_BLUE",
-	"CONST_ME_MAGIC_GREEN", "CONST_ME_SMALLPLANTS", "FLAG_NOLIMIT", "MESSAGE_EVENT_ADVANCE", "MESSAGE_FAREWELL",
+	"CONST_ME_MAGIC_GREEN", "CONST_ME_SMALLPLANTS", "CONST_ME_TELEPORT", "CONST_PROP_BLOCKSOLID", "FLAG_NOLIMIT", "MESSAGE_EVENT_ADVANCE", "MESSAGE_FAREWELL",
 	"MESSAGE_GREET", "MESSAGE_WALKAWAY", "TALKTYPE_MONSTER_SAY", "TALKTYPE_MONSTER_YELL",
+	"TILESTATE_PROTECTIONZONE",
 }
 
 local U = NOCTHOLD_DUNGEON
@@ -110,6 +112,50 @@ local function staticChecks()
 	local talk = Game.getTalkActions()
 	check(talk["!nocthold"] ~= nil, "el comando !nocthold no está registrado")
 	check(talk["/nocthold"] ~= nil, "el comando /nocthold no está registrado")
+end
+
+local function checkGeneratedMaps()
+	-- Mapas de data-nocthold/world/custom/ hechos con tools/mapas/generar_mapa.py. Canary los carga
+	-- solo al arrancar; aquí se mira que cada casilla tiene lo que dice el plano, en el motor real.
+	local mapas = Nocthold.mapas or {}
+	local count = 0
+	for name, mapa in pairs(mapas) do
+		count = count + 1
+		for point, p in pairs(mapa.puntos) do
+			local wp = getWaypointPositionByName(name .. "." .. point)
+			check(wp and wp.x == p[1] and wp.y == p[2] and wp.z == p[3], "mapa " .. name .. ": el punto '" .. point .. "' no está donde dice el plano")
+		end
+		local bad, floors, walls, first = 0, 0, 0, nil
+		for _, c in ipairs(mapa.casillas) do
+			local tile = Tile(Position(c[1], c[2], mapa.z))
+			local ground = tile and tile:getGround()
+			local problem
+			if not ground then
+				problem = "no hay casilla o no tiene suelo"
+			elseif ground:getId() ~= c[3] then
+				problem = "suelo " .. ground:getId() .. " en vez de " .. c[3]
+			elseif c[4] ~= 0 and not tile:getItemById(c[4]) then
+				problem = "falta el objeto " .. c[4]
+			elseif (c[4] ~= 0) ~= tile:hasProperty(CONST_PROP_BLOCKSOLID) then
+				problem = c[4] ~= 0 and "la pared no bloquea el paso" or "el suelo no se puede pisar"
+			elseif c[5] ~= tile:hasFlag(TILESTATE_PROTECTIONZONE) then
+				problem = c[5] and "debería ser zona protegida" or "no debería ser zona protegida"
+			end
+			if problem then
+				bad = bad + 1
+				first = first or (c[1] .. "," .. c[2] .. "," .. mapa.z .. ": " .. problem)
+			elseif c[4] ~= 0 then
+				walls = walls + 1
+			else
+				floors = floors + 1
+			end
+		end
+		if check(bad == 0, "mapa " .. name .. ": " .. bad .. " casillas no coinciden con el plano (la primera, " .. tostring(first) .. ")") then
+			check(floors == mapa.suelos and walls == mapa.paredes, "mapa " .. name .. ": cuenta de casillas distinta")
+			logger.info("[NOCTHOLD-TEST] Mapa generado " .. name .. ": " .. floors .. " suelos y " .. walls .. " paredes, todo como en el plano")
+		end
+	end
+	check(count > 0, "no hay mapas generados (falta data-nocthold/scripts/lib/nocthold_mapas.lua)")
 end
 
 local function buildArena()
@@ -249,6 +295,7 @@ function selftest.onStartup()
 	logger.info("[NOCTHOLD-TEST] Empieza la prueba automática")
 	addEvent(guarded("prueba", function()
 		staticChecks()
+		checkGeneratedMaps()
 		buildArena()
 		runDungeon()
 	end), 3000)
