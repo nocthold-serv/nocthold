@@ -35,3 +35,24 @@ function alMorir.onDeath(creature)
 	return true
 end
 alMorir:register()
+
+-- Al arrancar el servidor, cada mapa del generador (tools/mapas) que traiga grupos en su
+-- plano los coloca solo, dormidos y con su zona. No hace falta ningún comando.
+local alArrancar = GlobalEvent("NoctholdAggroArranque")
+function alArrancar.onStartup()
+	local nombres = {}
+	for nombre, mapa in pairs(Nocthold.mapas or {}) do
+		if mapa.grupos and next(mapa.grupos) then
+			nombres[#nombres + 1] = nombre
+		end
+	end
+	table.sort(nombres)
+	for _, nombre in ipairs(nombres) do
+		local p = Nocthold.mapas[nombre].puntos.entrada
+		if p and Tile(Position(p[1], p[2], p[3])) then
+			A.prepararMapa(nombre)
+		end
+	end
+	return true
+end
+alArrancar:register()

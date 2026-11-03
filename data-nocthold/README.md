@@ -82,8 +82,9 @@ despierta **el grupo entero** a la vez. Los GM/GOD no despiertan grupos.
   `despertar`, `quitarGrupo`); eventos en `scripts/nocthold/aggro.lua`.
 - Mapas del generador: `Nocthold.aggro.prepararMapa("<mapa>")` crea dormidos los grupos del
   plano (`Nocthold.mapas[m].grupos[letra] = { monstruo, radio, posiciones }`).
-- Probar en el juego (GOD): `/nocthold aggro` (3 Sabuesos al norte con la zona marcada),
-  `/nocthold aggro <mapa>`, `/nocthold aggro quitar`.
+- Sin comandos: al arrancar el servidor, cada mapa generado que traiga grupos en su plano
+  los coloca solo (`scripts/nocthold/aggro.lua`). La mazmorra podrá rehacerlos al empezar
+  una expedición con `prepararMapa`.
 
 ## Pendiente (siguiente trabajo)
 
