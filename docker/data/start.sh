@@ -259,6 +259,16 @@ set_lua_string "mapName" "$CANARY_MAP_NAME"
 if [ "$CANARY_DATA_PACK" != "data-canary" ] && [ "$CANARY_DATA_PACK" != "data-otservbr-global" ]; then
 	set_lua_line "useAnyDatapackFolder" "useAnyDatapackFolder = true"
 fi
+# El mundo propio aún no tiene monstruos normales repartidos por el mapa: sin esto, la
+# Forja de Canary intenta cada pocos segundos crear monstruos "influenced/fiendish" y llena
+# el log de avisos. Con el datapack global se dejan los valores normales de config.lua.dist.
+if [ "$CANARY_DATA_PACK" = "data-nocthold" ]; then
+	set_lua_number "forgeInfluencedLimit" 0
+	set_lua_number "forgeFiendishLimit" 0
+else
+	set_lua_number "forgeInfluencedLimit" 300
+	set_lua_number "forgeFiendishLimit" 4
+fi
 
 echo "config.lua updated"
 
