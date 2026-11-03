@@ -145,14 +145,25 @@ local function buildArena()
 
 	check(U.buildMap(fake) == true and U.mapReady, "un segundo buildmap no debería fallar")
 
-	-- Cada monstruo se puede crear en la sala (nombres con tilde incluidos).
+	-- Cada monstruo se puede crear en la sala (nombres con tilde incluidos), y el golpe de
+	-- prueba (/nocthold golpe) mata a los normales de un golpe y quita un 25 % a los 3 jefes.
+	local tester = { isPlayer = function() return true end, getGuid = function() return fake.guid end }
+	Nocthold.testDamage[fake.guid] = true
+	local bosses = 0
 	for _, name in ipairs(Nocthold.monsters) do
 		local monster = Game.createMonster(Nocthold.latin1(name), arenaPos(70, 15), true, true)
 		if check(monster ~= nil, "no se pudo crear " .. name .. " en la sala") then
-			check(monster:getMaxHealth() > 0, name .. " tiene vida 0")
+			local maxHealth = monster:getMaxHealth()
+			check(maxHealth > 0, name .. " tiene vida 0")
+			local isBoss = monster:getType():isRewardBoss()
+			if isBoss then bosses = bosses + 1 end
+			local expected = isBoss and math.ceil(maxHealth * 0.25) or maxHealth
+			check(Nocthold.testDamageFor(monster, tester) == expected, "golpe de prueba contra " .. name)
 			monster:remove()
 		end
 	end
+	Nocthold.testDamage[fake.guid] = nil
+	check(bosses == 3, "deberían ser 3 jefes, son " .. bosses)
 end
 
 local function killTracked()

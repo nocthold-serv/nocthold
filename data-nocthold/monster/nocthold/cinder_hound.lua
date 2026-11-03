@@ -53,4 +53,5 @@ monster.defenses = { defense = 10, armor = 10 }
 monster.immunities = {}
 
 mType:registerEvent("NoctholdDungeonDeath")
+mType:registerEvent("NoctholdTestDamage")
 mType:register(monster)
