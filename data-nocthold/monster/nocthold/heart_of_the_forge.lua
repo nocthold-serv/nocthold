@@ -53,6 +53,7 @@ monster.defenses = { defense = 160, armor = 140 }
 monster.immunities = {}
 
 mType:registerEvent("NoctholdDungeonDeath")
+mType:registerEvent("NoctholdTestDamage")
 
 local phases = {}
 mType.onThink = function(monster, interval)

@@ -94,6 +94,20 @@ assert(npcCount == 5, "Expected five NpcType registrations, got " .. npcCount)
 assert(loadfile(root .. "/scripts/nocthold/runtime/encounter_runtime.lua"))()
 assert(loadfile(root .. "/scripts/nocthold/runtime/adventure_commands.lua"))()
 assert(loadfile(root .. "/scripts/nocthold/nocthold_admin.lua"))()
+assert(loadfile(root .. "/scripts/nocthold/test_damage.lua"))()
+do
+    local flagged = { isPlayer = function() return true end, getGuid = function() return 55 end }
+    local other = { isPlayer = function() return true end, getGuid = function() return 56 end }
+    local function monster(boss)
+        return { getMaxHealth = function() return 1000 end, getType = function() return { isRewardBoss = function() return boss end } end }
+    end
+    Nocthold.testDamage[55] = true
+    assert(Nocthold.testDamageFor(monster(false), flagged) == 1000, "test damage must one-shot normal monsters")
+    assert(Nocthold.testDamageFor(monster(true), flagged) == 250, "test damage must take 25% from bosses")
+    assert(Nocthold.testDamageFor(monster(false), other) == nil, "test damage only for flagged players")
+    assert(Nocthold.testDamageFor(monster(false), nil) == nil, "test damage without attacker")
+    Nocthold.testDamage[55] = nil
+end
 local monsters = Nocthold.countMonsters()
 assert(monsters == 7, "Nocthold.countMonsters() = " .. monsters)
 assert(#Nocthold.npcs == Nocthold.expectedNpcs and #Nocthold.spells == Nocthold.expectedSpells, Nocthold.statusText())

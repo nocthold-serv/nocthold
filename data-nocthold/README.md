@@ -31,6 +31,13 @@ Tests sin servidor: `luajit tests/lua/test_nocthold_datapack.lua` y `luajit test
 El diseño (GDD, magias, talentos, objetos, mazmorra, afijos, misiones, mapa,
 tablas SQL) no está en este repositorio, que es público.
 
+### Golpe de prueba (solo GOD)
+
+`/nocthold golpe <jugador>` (o sin nombre, para ti) activa o quita el golpe de prueba: ese
+jugador mata de un golpe a los monstruos de Nocthold y a los jefes les quita un 25 % por
+golpe (4 golpes, para ver sus fases). No cambia ningún objeto ni a ningún otro monstruo y
+se borra al reiniciar el servidor.
+
 ## Cómo se usa
 
 Producción **no** usa esta carpeta: sigue con `data-otservbr-global`.
