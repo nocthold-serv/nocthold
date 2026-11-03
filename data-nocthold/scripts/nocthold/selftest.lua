@@ -122,7 +122,7 @@ local function buildArena()
 
 	check(U.buildMap(fake) == true, "buildmap falló: " .. lastMessage())
 	local total, withFloor = 0, 0
-	for _, r in ipairs(U.rects) do
+	for _, r in ipairs(U.rects()) do
 		for x = r[1], r[3] do
 			for y = r[2], r[4] do
 				total = total + 1

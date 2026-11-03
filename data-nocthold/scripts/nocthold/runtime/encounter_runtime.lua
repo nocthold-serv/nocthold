@@ -53,7 +53,7 @@ local function rects()
     }
 end
 
-U.rects = rects -- la prueba automatica (selftest.lua) recorre las mismas casillas
+U.rects = rects -- funcion: la prueba automatica (selftest.lua) recorre las mismas casillas
 
 function U.buildMap(player)
     if U.mapReady then

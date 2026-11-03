@@ -47,7 +47,7 @@ monster.loot = {
 }
 monster.attacks = {
     { name = "melee", type = COMBAT_PHYSICALDAMAGE, interval = 2000, minDamage = -450, maxDamage = -800 },
-    { name = "combat", type = COMBAT_FIREDAMAGE, interval = 6000, chance = 30, radius = 2, minDamage = -350, maxDamage = -650, target = false },
+    { name = "combat", type = COMBAT_FIREDAMAGE, interval = 6000, chance = 30, radius = 2, effect = CONST_ME_FIREAREA, minDamage = -350, maxDamage = -650, target = false },
 }
 monster.defenses = { defense = 160, armor = 140 }
 monster.immunities = {}

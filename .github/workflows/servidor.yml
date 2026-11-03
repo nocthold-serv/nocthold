@@ -240,6 +240,13 @@ jobs:
                 echo "::error::Hay avisos o errores en los archivos propios."
                 fallo=1
               fi
+              # Cualquier otro aviso o error de este arranque (los monstruos, por ejemplo, salen por
+              # su nombre y no por el fichero). Solo se perdonan dos avisos propios de Canary/Docker.
+              conocidos='Lua API documentation|executed as root user'
+              if echo "$logs" | grep -E "\[(warning|error)\]" | grep -vE "$conocidos|NOCTHOLD-TEST"; then
+                echo "::error::El arranque con data-nocthold tiene avisos o errores (arriba)."
+                fallo=1
+              fi
               # Cualquier error de Lua en este arranque, venga de donde venga.
               if echo "$logs" | grep -iE "lua script error|attempt to (call|index|compare|perform)|stack traceback"; then
                 echo "::error::Hay errores de Lua en el arranque con data-nocthold."
