@@ -212,33 +212,41 @@ jobs:
             timeout 5 bash -c "</dev/tcp/127.0.0.1/$puerto" || { echo "::error::El puerto $puerto no responde."; exit 1; }
           done
 
-      - name: Datapack propio (monstruos, NPC y /nocthold)
+      - name: Datapack propio (arranque y prueba de la mazmorra)
         run: |
           # Se vuelve a arrancar el servidor de pruebas con el datapack propio y el mapa
           # pequeño de data-canary. Es una BD de usar y tirar: nunca se hace con la real.
+          # NOCTHOLD_SELFTEST=1 activa data-nocthold/scripts/nocthold/selftest.lua, que dentro
+          # del servidor real construye la sala, crea NPC y monstruos y juega una llave 7 entera.
           compose="docker compose -p ci -f infra/canary/docker-compose.yml --env-file ci.env"
-          printf 'DATA_PACK=data-nocthold\nMAP_NAME=canary\n' >> ci.env
+          printf 'DATA_PACK=data-nocthold\nMAP_NAME=canary\nNOCTHOLD_SELFTEST=1\n' >> ci.env
           $compose up -d --force-recreate server
           for i in $(seq 1 60); do
             logs="$($compose logs --no-color server)"
             # Solo cuenta lo de este arranque (después de la línea del datapack nuevo).
             logs="$(echo "$logs" | sed -n '/CANARY_DATA_PACK:\[data-nocthold\]/,$p')"
-            if echo "$logs" | grep -q "server online!"; then
-              if echo "$logs" | grep -q "\[NOCTHOLD\] OK"; then
-                echo "$logs" | grep "\[NOCTHOLD\]"
-                # Errores en nuestros archivos. Un TalkAction que Canary no registra no dice el
-                # fichero, solo el comando ("TalkAction with name !nocthold ..."): también cuenta.
-                propios='monster/nocthold/|npc/nocthold_npcs|scripts/nocthold/|scripts/lib/nocthold|TalkAction with name [!/]nocthold'
-                if echo "$logs" | grep -E "$propios" | grep -iE "error|warn"; then
-                  echo "::error::Hay avisos o errores en los archivos propios."
-                  exit 1
-                fi
-                echo "El datapack propio arranca con sus 7 monstruos, 5 NPC y el comando /nocthold."
-                exit 0
+            if echo "$logs" | grep -qE "\[NOCTHOLD-TEST\] (TODO OK|FALLIDO)"; then
+              echo "::group::Avisos y errores de este arranque (todos, también los de Canary)"
+              echo "$logs" | grep -iE "error|warn" || echo "Ninguno."
+              echo "::endgroup::"
+              echo "$logs" | grep -E "\[NOCTHOLD(-TEST)?\]"
+              fallo=0
+              echo "$logs" | grep -q "\[NOCTHOLD\] OK" || { echo "::error::El datapack propio no dijo [NOCTHOLD] OK."; fallo=1; }
+              echo "$logs" | grep -q "\[NOCTHOLD-TEST\] TODO OK" || { echo "::error::La prueba de la mazmorra dentro del servidor ha fallado."; fallo=1; }
+              # Errores en nuestros archivos. Un TalkAction que Canary no registra no dice el
+              # fichero, solo el comando ("TalkAction with name !nocthold ..."): también cuenta.
+              propios='monster/nocthold/|npc/nocthold_npcs|scripts/nocthold/|scripts/lib/nocthold|TalkAction with name [!/]nocthold|NOCTHOLD'
+              if echo "$logs" | grep -E "$propios" | grep -iE "error|warn|FALLO"; then
+                echo "::error::Hay avisos o errores en los archivos propios."
+                fallo=1
               fi
-              echo "$logs" | grep -iE "nocthold|error" | sed 's/^/::error::/'
-              echo "::error::El servidor arrancó, pero el datapack propio no dijo [NOCTHOLD] OK."
-              exit 1
+              # Cualquier error de Lua en este arranque, venga de donde venga.
+              if echo "$logs" | grep -iE "lua script error|attempt to (call|index|compare|perform)|stack traceback"; then
+                echo "::error::Hay errores de Lua en el arranque con data-nocthold."
+                fallo=1
+              fi
+              [ "$fallo" = 0 ] && echo "El datapack propio arranca limpio y la mazmorra se juega entera dentro del servidor."
+              exit "$fallo"
             fi
             estado="$(docker inspect -f '{{.State.Status}} {{.RestartCount}}' ci-server-1)"
             case "$estado" in
@@ -246,7 +254,8 @@ jobs:
             esac
             sleep 10
           done
-          echo "::error::El servidor con data-nocthold no dijo 'server online!' en 10 minutos."
+          echo "$logs" | grep -iE "nocthold|error" | sed 's/^/::error::/'
+          echo "::error::El servidor con data-nocthold no terminó la prueba de la mazmorra en 10 minutos."
           exit 1
 
       - name: Logs si algo falla

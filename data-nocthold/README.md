@@ -51,6 +51,15 @@ GitHub Actions ya lo comprueba en cada PR que toca el servidor (paso
 ver `[NOCTHOLD] OK Contenido propio 1.0.0-alpha.1 cargado: 7/7 monstruos, 5/5 NPC, 30/30 hechizos.` sin errores en
 nuestros archivos.
 
+Además, en ese mismo arranque se activa `scripts/nocthold/selftest.lua` (solo con
+`NOCTHOLD_SELFTEST=1`, que pone GitHub Actions; en pruebas y producción no hace nada).
+Dentro del servidor real comprueba las constantes que usamos, los 30 hechizos por nombre y
+palabras, los comandos, la sala de `buildmap` casilla a casilla, los 5 NPC, crea los 7
+monstruos y juega una llave 7 entera (6 fases, afijos, refuerzos, llave a 8, salida y
+limpieza). Tiene que terminar en `[NOCTHOLD-TEST] TODO OK`. Lanzar hechizos, hablar con
+NPC y las fases de los jefes por vida necesitan un jugador conectado: eso lo prueban
+`tests/lua/test_nocthold_*.lua` con funciones simuladas y, al final, la prueba en el juego.
+
 ## Pendiente (siguiente trabajo)
 
 - Experiencia de los monstruos, botín de verdad y aspectos (lookType) e IDs a partir de los assets del cliente 15.25.

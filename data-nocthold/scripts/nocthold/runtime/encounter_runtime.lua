@@ -53,6 +53,8 @@ local function rects()
     }
 end
 
+U.rects = rects -- la prueba automatica (selftest.lua) recorre las mismas casillas
+
 function U.buildMap(player)
     if U.mapReady then
         tell(player, "El mapa dinamico ya esta construido en esta sesion.")

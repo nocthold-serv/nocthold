@@ -61,6 +61,8 @@ services:
       CANARY_DATA_PACK: "${DATA_PACK:-data-otservbr-global}"
       CANARY_MAP_NAME: "${MAP_NAME:-otservbr}"
       CANARY_MAP_URL: "${MAP_URL}"
+      # Solo GitHub Actions lo pone a 1: prueba la mazmorra entera al arrancar (data-nocthold).
+      NOCTHOLD_SELFTEST: "${NOCTHOLD_SELFTEST:-0}"
       OT_DB_HOST: db
       OT_DB_PORT: "3306"
       OT_DB_DATABASE: "${DB_NAME}"
