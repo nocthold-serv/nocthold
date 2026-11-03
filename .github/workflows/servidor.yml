@@ -2,7 +2,7 @@
 # Comprueba el servidor y construye la imagen Docker de Nocthold (fase 3).
 #
 # - Comprobaciones rápidas (1-2 min): sintaxis de todos los .lua, tests Lua de
-#   tests/lua y shellcheck de los scripts de infra/.
+#   tests/lua, tests del generador de mapas (tools/mapas) y shellcheck de infra/.
 # - Imagen y arranque: compila Canary en Docker (docker/Dockerfile.x86), levanta
 #   MariaDB + servidor + login con nuestro infra/canary/docker-compose.yml,
 #   espera a "server online!" y prueba un login real con la cuenta de ejemplo.
@@ -64,6 +64,13 @@ jobs:
             luajit "$f" || fallos=1
           done
           exit $fallos
+
+      - name: Generador de mapas (tools/mapas)
+        run: |
+          # Lee y escribe .otbm, orienta paredes como el RME, comprueba los materiales con
+          # data/items/appearances.dat y que los mapas de data-nocthold/world/custom están al día.
+          python3 -m unittest discover -s tools/mapas -v
+          python3 tools/mapas/generar_mapa.py --comprobar
 
       - name: Shellcheck de los scripts de infra
         run: shellcheck -S warning infra/canary/*.sh infra/vps/*.sh

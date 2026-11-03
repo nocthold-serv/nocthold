@@ -1,0 +1,15 @@
+{
+  "_nota": "Suelos y paredes que entiende generar_mapa.py. Los números son IDs de objeto de Canary 15.x (los mismos que ve el RME). Para los suelos con varias piezas, el número de al lado es el peso (cuántas veces sale más que las demás). Las paredes siguen las piezas del pincel del RME: horizontal, vertical, esquina y poste. test_mapas.py comprueba con data/items/appearances.dat que todo existe y es lo que dice ser.",
+  "suelos": {
+    "piedra gris": [[429, 1]],
+    "piedra": [[436, 1]],
+    "marmol negro": [[410, 1]],
+    "adoquin marron": [[7593, 1], [7595, 1], [7596, 1], [7597, 1], [7598, 1], [7599, 1], [7600, 1], [7601, 1]],
+    "tierra de cueva": [[351, 6], [352, 1], [353, 1], [354, 1], [355, 1], [7756, 2500], [10480, 1000]]
+  },
+  "paredes": {
+    "piedra": {"horizontal": 1295, "vertical": 1294, "esquina": 1298, "poste": 1296, "puerta_horizontal": 6251, "puerta_vertical": 6248},
+    "roca": {"horizontal": 1113, "vertical": 1112, "esquina": 1116, "poste": 1114},
+    "piedra clara": {"horizontal": 1547, "vertical": 1549, "esquina": 1550, "poste": 1551}
+  }
+}
