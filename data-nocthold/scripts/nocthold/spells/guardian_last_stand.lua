@@ -3,7 +3,8 @@
 
 local spell = Spell("instant")
 spell:name("Last Stand")
-spell:words("nocthold last stand")
+spell:words("stal ultor")
+spell:id(1009)
 spell:group("support")
 spell:cooldown(90000)
 spell:groupCooldown(1000)

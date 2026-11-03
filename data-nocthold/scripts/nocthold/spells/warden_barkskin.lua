@@ -2,7 +2,8 @@
 -- Canary 3.6.1 Revscriptsys; values are first-pass balance and require in-game tuning.
 local spell = Spell("instant")
 spell:name("Barkskin")
-spell:words("nocthold barkskin")
+spell:words("ronce crot")
+spell:id(1020)
 spell:group("support")
 spell:cooldown(22000)
 spell:groupCooldown(1000)

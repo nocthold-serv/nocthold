@@ -94,15 +94,20 @@ local function staticChecks()
 	check(#Nocthold.npcs == Nocthold.expectedNpcs, "NPC registrados " .. #Nocthold.npcs .. "/" .. Nocthold.expectedNpcs)
 	check(#Nocthold.spells == Nocthold.expectedSpells, "hechizos registrados " .. #Nocthold.spells .. "/" .. Nocthold.expectedSpells)
 
-	-- Hechizos: Canary los tiene de verdad, con palabras "nocthold ..." únicas que llevan al mismo hechizo.
-	local seenWords = {}
+	-- Hechizos: Canary los tiene de verdad, con palabras únicas que llevan al mismo hechizo y un id
+	-- propio (1001-1030) único: el enfriamiento va por id y el cliente busca el icono por ese id.
+	local seenWords, seenIds = {}, {}
 	for _, name in ipairs(Nocthold.spells) do
 		local spell = Spell(name)
 		if check(spell ~= nil, "Canary no conoce el hechizo " .. name) then
 			local words = spell:words()
-			check(type(words) == "string" and words:sub(1, 9) == "nocthold ", "palabras del hechizo " .. name .. ": " .. tostring(words))
+			check(type(words) == "string" and words ~= "" and not words:find("nocthold", 1, true), "palabras del hechizo " .. name .. ": " .. tostring(words))
 			check(not seenWords[words or ""], "palabras repetidas: " .. tostring(words))
 			seenWords[words or ""] = true
+			local id = spell:id()
+			check(type(id) == "number" and id >= 1001 and id <= 1030, "id del hechizo " .. name .. ": " .. tostring(id))
+			check(not seenIds[id or 0], "id repetido: " .. tostring(id))
+			seenIds[id or 0] = true
 			local byWords = words and Spell(words)
 			check(byWords ~= nil and byWords:name() == name, "las palabras '" .. tostring(words) .. "' no llevan a " .. name)
 		end
