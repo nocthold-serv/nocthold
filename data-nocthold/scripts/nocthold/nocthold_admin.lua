@@ -1,8 +1,10 @@
 -- Nocthold - diagnóstico de carga y herramientas de prueba.
 -- Canary Revscriptsys. Comando restringido al grupo GOD.
--- No crea monstruos, no modifica storages ni la base de datos. Solo teletransporta al propio
+-- Solo crea monstruos con "/nocthold aggro" (ver abajo); no modifica storages ni la base de datos. Teletransporta al propio
 -- GOD con "/nocthold mapa <nombre>" (a la entrada de un mapa generado con tools/mapas).
 -- "golpe" solo cambia una tabla en memoria (ver scripts/nocthold/test_damage.lua).
+-- "aggro" crea monstruos dormidos con su zona de aggro (ver scripts/lib/nocthold_aggro.lua)
+-- para probar la mecánica; se quitan con "/nocthold aggro quitar" o al reiniciar.
 
 local noctholdStatus = TalkAction("/nocthold")
 
@@ -12,7 +14,7 @@ function noctholdStatus.onSay(player, words, param)
 	command = command:lower()
 
 	if command == "" or command == "help" then
-		player:sendTextMessage(MESSAGE_EVENT_ADVANCE, "Nocthold " .. Nocthold.version .. " | /nocthold status | /nocthold spells | /nocthold golpe [jugador] | /nocthold mapa [nombre] | /nocthold help. Jugadores: !nocthold help")
+		player:sendTextMessage(MESSAGE_EVENT_ADVANCE, "Nocthold " .. Nocthold.version .. " | /nocthold status | /nocthold spells | /nocthold golpe [jugador] | /nocthold mapa [nombre] | /nocthold aggro [mapa|quitar] | /nocthold help. Jugadores: !nocthold help")
 		return true
 	end
 
@@ -73,6 +75,49 @@ function noctholdStatus.onSay(player, words, param)
 		end
 		table.sort(points)
 		player:sendTextMessage(MESSAGE_EVENT_ADVANCE, "Mapa " .. argument:lower() .. ". Puntos: " .. table.concat(points, ", "))
+		return true
+	end
+
+	if command == "aggro" then
+		local A = Nocthold.aggro
+		local opcion = argument:lower()
+		if opcion == "quitar" then
+			local quitados = 0
+			for id in pairs(A.grupos) do
+				if A.quitarGrupo(id) then
+					quitados = quitados + 1
+				end
+			end
+			player:sendTextMessage(MESSAGE_EVENT_ADVANCE, "Grupos de aggro quitados: " .. quitados .. ".")
+			return true
+		end
+		if opcion ~= "" then
+			if not (Nocthold.mapas and Nocthold.mapas[opcion]) then
+				player:sendCancelMessage("No hay un mapa generado con ese nombre. Usa /nocthold mapa para ver la lista.")
+				return true
+			end
+			local grupos, total, avisos = A.prepararMapa(opcion)
+			player:sendTextMessage(MESSAGE_EVENT_ADVANCE, Nocthold.latin1("Mapa " .. opcion .. ": " .. grupos .. " grupos y " .. total .. " monstruos dormidos." .. (#avisos > 0 and (" Avisos: " .. table.concat(avisos, "; ")) or "")))
+			return true
+		end
+		-- Grupo de prueba: 3 Sabuesos de Ceniza 5 casillas al norte, zona de 2 casillas alrededor.
+		local p = player:getPosition()
+		local creados = {}
+		for dx = -1, 1 do
+			local m = Game.createMonster(Nocthold.latin1("Sabueso de Ceniza"), Position(p.x + dx, p.y - 5, p.z), true, true)
+			if m then
+				m:setDormant(true)
+				creados[#creados + 1] = m
+			end
+		end
+		local id = "prueba." .. player:getGuid()
+		local g, motivo = A.crearGrupo(id, creados, 2)
+		if not g then
+			player:sendCancelMessage(motivo or "No se pudo crear el grupo.")
+			return true
+		end
+		A.ensenarZona(id)
+		player:sendTextMessage(MESSAGE_EVENT_ADVANCE, Nocthold.latin1(#creados .. " Sabuesos dormidos al norte. Las chispas verdes marcan su zona: entra con un personaje normal (al GOD lo ignoran) o pégale a uno y se despiertan los " .. #creados .. ". /nocthold aggro quitar para borrarlos."))
 		return true
 	end
 

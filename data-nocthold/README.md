@@ -69,6 +69,22 @@ limpieza). Tiene que terminar en `[NOCTHOLD-TEST] TODO OK`. Lanzar hechizos, hab
 NPC y las fases de los jefes por vida necesitan un jugador conectado: eso lo prueban
 `tests/lua/test_nocthold_*.lua` con funciones simuladas y, al final, la prueba en el juego.
 
+## Zonas de aggro (pulls)
+
+Los monstruos de un grupo pueden estar **dormidos**: ven a los jugadores pero no atacan ni se
+mueven hasta que alguien entra en la zona invisible del grupo (una caja alrededor de sus
+monstruos más `radio` casillas, 3 por defecto) o le hace daño a uno de ellos. Entonces se
+despierta **el grupo entero** a la vez. Los GM/GOD no despiertan grupos.
+
+- Motor: `monster:setDormant(true|false)` y `monster:isDormant()` (cambio nuestro en
+  `src/creatures/monsters/monster.cpp`).
+- Lógica: `scripts/lib/nocthold_aggro.lua` (`Nocthold.aggro.crearGrupo`, `prepararMapa`,
+  `despertar`, `quitarGrupo`); eventos en `scripts/nocthold/aggro.lua`.
+- Mapas del generador: `Nocthold.aggro.prepararMapa("<mapa>")` crea dormidos los grupos del
+  plano (`Nocthold.mapas[m].grupos[letra] = { monstruo, radio, posiciones }`).
+- Probar en el juego (GOD): `/nocthold aggro` (3 Sabuesos al norte con la zona marcada),
+  `/nocthold aggro <mapa>`, `/nocthold aggro quitar`.
+
 ## Pendiente (siguiente trabajo)
 
 - Experiencia de los monstruos, botín de verdad y aspectos (lookType) e IDs a partir de los assets del cliente 15.25.
