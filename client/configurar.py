@@ -18,7 +18,9 @@ Cambia:
     así un .zip nuevo no obliga a descargarlos otra vez. Y no se bajan los
     "extras" del cliente oficial (carpeta bin), que OTClient no necesita.
   * Quita mods/game_bot: OTClient trae un bot (cavebot, targetbot) que no
-    queremos repartir a los jugadores.
+    queremos repartir a los jugadores. También lo quita de la lista de
+    client_mods (si no, el log dice "Unable to find module 'game_bot'") y de
+    client_profiles (si no, cambiar de perfil daría un error de Lua).
 
 Si la versión de OTClient cambia y el texto que buscamos ya no está, el script
 falla en vez de dejar un cliente a medio configurar.
@@ -71,6 +73,24 @@ def parchear_entergame(carpeta: Path) -> None:
     fichero.write_text(texto.replace(PRECARGA_ORIGINAL, PRECARGA_NOCTHOLD), encoding="utf-8")
 
 
+def quitar_referencias_bot(carpeta: Path) -> None:
+    mods = carpeta / "mods" / "client_mods" / "mods.otmod"
+    texto = mods.read_text(encoding="utf-8")
+    nuevo = re.sub(r"^[ \t]*- game_bot[ \t]*\r?\n", "", texto, flags=re.M)
+    if nuevo == texto:
+        sys.exit("ERROR: no encuentro game_bot en mods/client_mods/mods.otmod; ¿ha cambiado OTClient?")
+    mods.write_text(nuevo, encoding="utf-8")
+
+    perfiles = carpeta / "mods" / "client_profiles" / "profiles.lua"
+    texto = perfiles.read_text(encoding="utf-8")
+    original = "  modules.game_bot.refresh()\n"
+    if texto.count(original) != 1:
+        sys.exit("ERROR: no encuentro modules.game_bot.refresh() en profiles.lua; ¿ha cambiado OTClient?")
+    perfiles.write_text(
+        texto.replace(original, "  if modules.game_bot then modules.game_bot.refresh() end\n"), encoding="utf-8"
+    )
+
+
 def main() -> None:
     if len(sys.argv) != 3 or sys.argv[2] not in CANALES:
         sys.exit(__doc__)
@@ -115,6 +135,7 @@ def main() -> None:
     if bot.exists():
         shutil.rmtree(bot)
         print("Quitado el bot integrado (mods/game_bot)")
+    quitar_referencias_bot(carpeta)
     print(f"init.lua configurado para {canal['nombre']} ({url}, protocolo {PROTOCOLO})")
 
 
