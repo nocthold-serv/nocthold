@@ -2,6 +2,8 @@
 -- Canary Revscriptsys. Comando restringido al grupo GOD.
 -- No crea monstruos, no modifica storages ni la base de datos. Solo teletransporta al propio
 -- GOD con "/nocthold mapa <nombre>" (a la entrada de un mapa generado con tools/mapas).
+-- "forja" lleva al GOD a la entrada de La Forja Caída, "llave" le da una piedra-llave y
+-- "reset" vacía la mazmorra (los jugadores entran sin comandos: ver runtime/dungeon_entrance.lua).
 -- "golpe" solo cambia una tabla en memoria (ver scripts/nocthold/test_damage.lua).
 
 local noctholdStatus = TalkAction("/nocthold")
@@ -12,7 +14,7 @@ function noctholdStatus.onSay(player, words, param)
 	command = command:lower()
 
 	if command == "" or command == "help" then
-		player:sendTextMessage(MESSAGE_EVENT_ADVANCE, "Nocthold " .. Nocthold.version .. " | /nocthold status | /nocthold spells | /nocthold golpe [jugador] | /nocthold mapa [nombre] | /nocthold help. Jugadores: !nocthold help")
+		player:sendTextMessage(MESSAGE_EVENT_ADVANCE, "Nocthold " .. Nocthold.version .. " | /nocthold status | /nocthold spells | /nocthold golpe [jugador] | /nocthold mapa [nombre] | /nocthold forja | /nocthold llave [0-10] | /nocthold reset | /nocthold help")
 		return true
 	end
 
@@ -42,6 +44,42 @@ function noctholdStatus.onSay(player, words, param)
 		player:sendTextMessage(MESSAGE_EVENT_ADVANCE, Nocthold.latin1("Golpe de prueba para " .. target:getName() .. " " .. state))
 		if target:getGuid() ~= player:getGuid() then
 			target:sendTextMessage(MESSAGE_EVENT_ADVANCE, Nocthold.latin1("Golpe de prueba " .. state))
+		end
+		return true
+	end
+
+	local U = NOCTHOLD_DUNGEON
+	if command == "forja" then
+		if not U or not U.mapReady then
+			player:sendCancelMessage(Nocthold.latin1("La Forja Caída no está preparada (mira el log del arranque)."))
+			return true
+		end
+		player:teleportTo(U.layoutPos("arrival"))
+		U.layoutPos("arrival"):sendMagicEffect(CONST_ME_TELEPORT)
+		player:sendTextMessage(MESSAGE_EVENT_ADVANCE, Nocthold.latin1(U.statusText()))
+		return true
+	end
+
+	if command == "llave" then
+		local level = tonumber(argument ~= "" and argument or "0")
+		if not U or not level or level < 0 or level > 10 or level % 1 ~= 0 then
+			player:sendCancelMessage("Uso: /nocthold llave 0-10")
+			return true
+		end
+		if U.giveKey(player, level) then
+			player:sendTextMessage(MESSAGE_EVENT_ADVANCE, "Piedra-llave de nivel " .. level .. " en tu mochila.")
+		else
+			player:sendCancelMessage("No cabe en tu mochila.")
+		end
+		return true
+	end
+
+	if command == "reset" then
+		if U and U.run then
+			U.reset(true)
+			player:sendTextMessage(MESSAGE_EVENT_ADVANCE, Nocthold.latin1("La Forja Caída queda libre: monstruos quitados y jugadores a la entrada."))
+		else
+			player:sendTextMessage(MESSAGE_EVENT_ADVANCE, Nocthold.latin1("No hay ninguna expedición en marcha."))
 		end
 		return true
 	end

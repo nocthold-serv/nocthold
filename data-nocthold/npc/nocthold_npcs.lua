@@ -1,6 +1,9 @@
 -- Nocthold NPC prototypes for Canary Revscripts/NpcType API.
--- All five are registered as NPC types. The dungeon runtime places them with !nocthold buildmap.
+-- All five are registered as NPC types. The dungeon runtime places them when the server starts.
 -- Nocthold: cada NPC se apunta en Nocthold.npcs (scripts/lib/nocthold.lua) para el aviso de arranque.
+
+-- Jugadores a los que el Cronista acaba de preguntar el nivel de la llave (por id de criatura).
+local cronistaWaiting = {}
 
 local function registerNoctholdNpc(def)
     -- Textos a Latin-1 para que el cliente muestre bien acentos y ñ (ver scripts/lib/nocthold.lua).
@@ -50,6 +53,14 @@ local function registerNoctholdNpc(def)
             return false
         end
         local lowerMessage = message:lower()
+        -- Respuestas que hacen algo (dar la piedra-llave, decir el estado): def.onMessage.
+        if def.onMessage then
+            local answer = def.onMessage(player, lowerMessage)
+            if answer then
+                npcHandler:say(t(answer), npc, player)
+                return true
+            end
+        end
         for keyword, reply in pairs(def.replies) do
             -- "contrato" también vale si el jugador escribe "contratos".
             if MsgContains(lowerMessage, keyword) or MsgContains(lowerMessage, keyword .. "s") then
@@ -76,7 +87,7 @@ registerNoctholdNpc({
     greeting = "Puedo hablarte de los contratos, la Forja Caída o las temporadas.",
     replies = {
         contrato = "Los Marjales de Ceniza están infestados. Empieza por los Carroñeros de Escoria y los Sabuesos.",
-        forja = "La Forja Caída ya está disponible en alfa. Usa !nocthold key 0-10, !nocthold enter y !nocthold start. El grupo admite hasta cinco aventureros.",
+        forja = "La Forja Caída está detrás de este pasillo. Pide una piedra-llave al Cronista y úsala en el altar: entraréis todo el grupo, hasta cinco aventureros.",
         temporada = "Las temporadas rotarán afijos y recompensas. El Cronista conserva los registros.",
     },
     fallback = "Pregúntame por contrato, forja o temporada.",
@@ -100,10 +111,15 @@ registerNoctholdNpc({
     greeting = "Custodio los registros de Eryndor.",
     replies = {
         historia = "La Forja Caída era el corazón industrial de Eryndor. Algo despertó bajo sus cámaras.",
-        temporada = "Consulta el estado de la expedición con !nocthold status. El ranking de temporada aún está pendiente.",
+        temporada = "Pregúntame por el estado de la expedición cuando quieras. El ranking de temporada aún está pendiente.",
         sintonia = "La sintonización de mazmorra desbloqueará dificultades y rutas conforme avances.",
     },
-    fallback = "Pregúntame por historia, temporada o sintonía.",
+    fallback = "Pregúntame por historia, estado, temporada o sintonía.",
+    onMessage = function(player, message)
+        if MsgContains(message, "estado") then
+            return NOCTHOLD_DUNGEON.statusText()
+        end
+    end,
 })
 
 registerNoctholdNpc({
@@ -123,9 +139,27 @@ registerNoctholdNpc({
     voice = "Cinco nombres. Una llave. Una historia.",
     greeting = "Registro las expediciones de cinco aventureros.",
     replies = {
-        llave = "En alfa puedes preparar una llave con !nocthold key 0-10. El líder entra con !nocthold enter e inicia con !nocthold start. Solo hay una arena compartida a la vez.",
         grupo = "La composición recomendada es un tanque, un sanador y tres DPS.",
         ranking = "El ranking se calculará en servidor y guardará las mejores ejecuciones válidas.",
     },
     fallback = "Pregúntame por llave, grupo o ranking.",
+    onMessage = function(player, message)
+        local id = player:getId()
+        local level = tonumber(message:match("%d+"))
+        if level and (MsgContains(message, "llave") or cronistaWaiting[id]) then
+            if level > 10 then
+                cronistaWaiting[id] = true
+                return "Las piedras-llave van del nivel 0 al 10. Dime otro número."
+            end
+            cronistaWaiting[id] = nil
+            if not NOCTHOLD_DUNGEON.giveKey(player, level) then
+                return "No te cabe en la mochila. Haz sitio y vuelve a pedírmela."
+            end
+            return "Aquí tienes tu piedra-llave de nivel " .. level .. ". El líder la usa en el altar y entra todo el grupo. Si termináis a tiempo, subirá de nivel."
+        end
+        if MsgContains(message, "llave") then
+            cronistaWaiting[id] = true
+            return "¿De qué nivel quieres la piedra-llave? Dime un número del 0 al 10. En alfa puedes elegir; más adelante solo se ganará jugando."
+        end
+    end,
 })

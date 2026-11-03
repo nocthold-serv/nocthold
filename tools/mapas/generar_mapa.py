@@ -37,7 +37,7 @@ PLANOS = os.path.join(AQUI, "planos")
 SALIDA_MAPAS = os.path.join(RAIZ, "data-nocthold", "world", "custom")
 SALIDA_LUA = os.path.join(RAIZ, "data-nocthold", "scripts", "lib", "nocthold_mapas.lua")
 
-# Zona reservada para la sala que construye "!nocthold buildmap" (encounter_runtime.lua).
+# Zona reservada para la sala de La Forja Caída que se genera al arrancar (encounter_runtime.lua).
 ZONA_BUILDMAP = (64000, 64000, 64080, 64030, 7)
 
 # Va en la descripción de cada .otbm generado (se ve en el RME, en las propiedades del mapa).
@@ -282,7 +282,7 @@ def generar_todo(carpeta=PLANOS):
             opciones, filas = leer_plano(f.read(), fichero)
         m, info = generar(opciones, filas, materiales, fichero)
         if _solapan(info["caja"], ZONA_BUILDMAP):
-            raise ErrorPlano(f"{fichero}: se mete en la zona de '!nocthold buildmap' (X 64000-64080, Y 64000-64030, Z 7)")
+            raise ErrorPlano(f"{fichero}: se mete en la sala de La Forja Caída (X 64000-64080, Y 64000-64030, Z 7)")
         for otro_m, otro in mapas:
             if otro["nombre"] == info["nombre"]:
                 raise ErrorPlano(f"{fichero}: ya hay otro plano con el nombre '{info['nombre']}'")

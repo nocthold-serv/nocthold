@@ -4,10 +4,11 @@
 --
 -- Qué comprueba, con el motor de Canary de verdad:
 --   constantes usadas por los scripts, los 7 monstruos, los 30 hechizos (nombre y palabras),
---   los comandos /nocthold y !nocthold, los mapas generados (tools/mapas) casilla a casilla,
---   la sala de buildmap casilla a casilla, los 5 NPC,
---   y una expedición entera de llave 7 (6 fases, afijos, refuerzos de jefe, muertes,
---   mejora de llave, salida y limpieza) con un jugador simulado.
+--   el comando /nocthold (y que ya no existe !nocthold), los mapas generados (tools/mapas)
+--   casilla a casilla, la sala de La Forja Caída casilla a casilla, los 5 NPC, el portal del
+--   templo, el altar, la barrera y el portal de salida, una piedra-llave de verdad,
+--   y una expedición entera de llave 7 empezada desde el altar (6 fases, afijos, refuerzos de
+--   jefe, muertes, la piedra sube a 8, portal final, salida y limpieza) con un jugador simulado.
 -- Lo que NO puede probar sin un cliente conectado: lanzar los hechizos, hablar con los NPC
 -- y las fases de los jefes por vida (Canary no "piensa" por monstruos sin jugadores cerca).
 -- Eso lo cubren los tests de tests/lua y la prueba en el juego.
@@ -57,7 +58,8 @@ local constants = {
 	"CONDITION_PARAM_TICKS", "CONDITION_REGENERATION", "CONST_ME_BLOCKHIT", "CONST_ME_ENERGYHIT",
 	"CONST_ME_EXPLOSIONHIT", "CONST_ME_FIREAREA", "CONST_ME_GREEN_RINGS", "CONST_ME_GROUNDSHAKER",
 	"CONST_ME_HITAREA", "CONST_ME_HOLYDAMAGE", "CONST_ME_ICEATTACK", "CONST_ME_MAGIC_BLUE",
-	"CONST_ME_MAGIC_GREEN", "CONST_ME_SMALLPLANTS", "CONST_ME_TELEPORT", "CONST_PROP_BLOCKSOLID", "FLAG_NOLIMIT", "MESSAGE_EVENT_ADVANCE", "MESSAGE_FAREWELL",
+	"CONST_ME_MAGIC_GREEN", "CONST_ME_SMALLPLANTS", "CONST_ME_TELEPORT", "CONST_PROP_BLOCKSOLID", "CONST_SLOT_FIRST", "CONST_SLOT_LAST",
+	"FLAG_NOLIMIT", "ITEM_ATTRIBUTE_DESCRIPTION", "ITEM_ATTRIBUTE_NAME", "MESSAGE_EVENT_ADVANCE", "MESSAGE_FAREWELL",
 	"MESSAGE_GREET", "MESSAGE_WALKAWAY", "TALKTYPE_MONSTER_SAY", "TALKTYPE_MONSTER_YELL",
 	"TILESTATE_PROTECTIONZONE",
 }
@@ -68,19 +70,22 @@ local function arenaPos(dx, dy)
 end
 
 -- Jugador simulado: solo lo usa el código Lua de la mazmorra, nunca entra en el mapa.
+-- Lleva en la mochila (fake.key) una piedra-llave de verdad, creada en el suelo de la sala.
 local fake = { guid = -4242, messages = {} }
-local function newFake(position)
-	fake.position = position
-	function fake:getGuid() return self.guid end
-	function fake:getName() return "Probador CI" end
-	function fake:getPosition() return self.position end
-	function fake:getParty() return nil end
-	function fake:teleportTo(p) return true end
-	function fake:addMoney(amount) self.money = (self.money or 0) + amount return true end
-	function fake:sendTextMessage(_, text) self.messages[#self.messages + 1] = text return true end
-	return fake
+local function newFake(position, guid)
+	local f = { guid = guid or -4242, messages = {}, position = position }
+	function f:getGuid() return self.guid end
+	function f:getName() return "Probador CI" end
+	function f:getPosition() return self.position end
+	function f:getParty() return nil end
+	function f:getGroup() return { getAccess = function() return false end } end
+	function f:teleportTo(p) self.position = p return true end
+	function f:addMoney(amount) self.money = (self.money or 0) + amount return true end
+	function f:sendTextMessage(_, text) self.messages[#self.messages + 1] = text return true end
+	function f:getSlotItem(slot) if slot == CONST_SLOT_FIRST then return self.key end return nil end
+	return f
 end
-local function lastMessage() return fake.messages[#fake.messages] or "" end
+local function lastMessage() return fake.messages and fake.messages[#fake.messages] or "" end
 
 local function staticChecks()
 	-- Constantes que los scripts usan y que deben existir en este Canary.
@@ -108,10 +113,16 @@ local function staticChecks()
 		end
 	end
 
-	-- Comandos.
+	-- Comandos: solo el de GOD. Los jugadores no usan ninguno.
 	local talk = Game.getTalkActions()
-	check(talk["!nocthold"] ~= nil, "el comando !nocthold no está registrado")
+	check(talk["!nocthold"] == nil, "el comando !nocthold de jugador debería haber desaparecido")
 	check(talk["/nocthold"] ~= nil, "el comando /nocthold no está registrado")
+
+	-- Objetos de la entrada: existen y son lo que creemos.
+	local key = ItemType(U.ITEM_KEY)
+	check(key and key:getId() == U.ITEM_KEY and key:isPickupable() and not key:isStackable(), "la piedra-llave (" .. U.ITEM_KEY .. ") debe poder cogerse y no apilarse")
+	check(ItemType(U.ITEM_PORTAL):getId() == U.ITEM_PORTAL and not ItemType(U.ITEM_PORTAL):isMovable(), "el portal (" .. U.ITEM_PORTAL .. ") no existe o se puede mover")
+	check(ItemType(U.ITEM_ALTAR):getId() == U.ITEM_ALTAR and not ItemType(U.ITEM_ALTAR):isMovable(), "el altar (" .. U.ITEM_ALTAR .. ") no existe o se puede mover")
 end
 
 local function checkGeneratedMaps()
@@ -158,15 +169,21 @@ local function checkGeneratedMaps()
 	check(count > 0, "no hay mapas generados (falta data-nocthold/scripts/lib/nocthold_mapas.lua)")
 end
 
+local function hasAid(position, itemId, aid)
+	local tile = Tile(position)
+	local item = tile and tile:getItemById(itemId)
+	return item ~= nil and item:getActionId() == aid
+end
+
 local function buildArena()
+	-- dungeon_entrance.lua la prepara sola al arrancar con el suelo del templo.
 	local town = Game.getTowns()[1]
 	check(town ~= nil, "el mapa no tiene ciudades")
 	local start = town:getTemplePosition()
-	newFake(start)
-	check(Tile(start) and Tile(start):getGround(), "no hay suelo en el templo " .. start.x .. "," .. start.y .. "," .. start.z)
+	fake = newFake(start)
 	local floorId = Tile(start):getGround():getId()
+	check(U.mapReady and U.worldReady, "La Forja Caída no se preparó sola al arrancar")
 
-	check(U.buildMap(fake) == true, "buildmap falló: " .. lastMessage())
 	local total, withFloor = 0, 0
 	for _, r in ipairs(U.rects()) do
 		for x = r[1], r[3] do
@@ -189,7 +206,41 @@ local function buildArena()
 		check(npcs[Nocthold.latin1(name)] or npcs[name], "el NPC " .. name .. " no aparece en la entrada")
 	end
 
-	check(U.buildMap(fake) == true and U.mapReady, "un segundo buildmap no debería fallar")
+	-- Portal del templo, altar, portal de salida y barrera.
+	check(U.townPortal and hasAid(U.townPortal, U.ITEM_PORTAL, U.AID_TO_LOBBY), "no hay portal junto al templo")
+	if U.townPortal then
+		check(math.abs(U.townPortal.x - start.x) <= 4 and math.abs(U.townPortal.y - start.y) <= 4 and U.townPortal.z == start.z, "el portal está lejos del templo")
+		check(not Tile(U.townPortal):hasProperty(CONST_PROP_BLOCKSOLID), "el portal del templo no se puede pisar")
+	end
+	check(hasAid(U.layoutPos("altar"), U.ITEM_ALTAR, U.AID_ALTAR), "no hay altar en la entrada")
+	check(hasAid(U.layoutPos("exitPortal"), U.ITEM_PORTAL, U.AID_TO_TOWN), "no hay portal de salida en la entrada")
+	check(not Tile(U.layoutPos("exitPortal")):hasProperty(CONST_PROP_BLOCKSOLID), "el portal de salida no se puede pisar")
+	local b = U.layout.barrier
+	for y = b[2], b[3] do
+		local ground = Tile(arenaPos(b[1], y)):getGround()
+		check(ground:getActionId() == U.AID_BARRIER, "la casilla " .. b[1] .. "," .. y .. " de la barrera no tiene su acción")
+	end
+	-- La barrera corta el paso: no hay otra fila de casillas entre la entrada y la mazmorra.
+	check(Tile(arenaPos(b[1], b[2] - 1)) == nil or Tile(arenaPos(b[1], b[2] - 1)):getGround() == nil, "se puede rodear la barrera por arriba")
+	check(Tile(arenaPos(b[1], b[3] + 1)) == nil or Tile(arenaPos(b[1], b[3] + 1)):getGround() == nil, "se puede rodear la barrera por abajo")
+
+	local again = U.setupWorld()
+	check(again == true, "preparar La Forja Caída una segunda vez no debería fallar")
+	local portals = 0
+	for _, item in ipairs(Tile(U.layoutPos("exitPortal")):getItems() or {}) do
+		if item:getId() == U.ITEM_PORTAL then portals = portals + 1 end
+	end
+	check(portals == 1, "la segunda preparación duplicó objetos")
+
+	-- Piedra-llave de verdad: nivel, nombre y acción.
+	local key = Game.createItem(U.ITEM_KEY, 1, arenaPos(2, 20))
+	if check(key ~= nil, "no se pudo crear la piedra-llave") then
+		U.setKeyLevel(key, 7)
+		check(U.keyLevel(key) == 7 and key:getActionId() == U.AID_KEY, "la piedra-llave no guarda su nivel")
+		check(key:getName():find("piedra%-llave") ~= nil and key:getName():find("nivel 7") ~= nil, "nombre de la piedra-llave: " .. key:getName())
+		fake.key = key
+		check(#U.findKeys(fake) == 1, "no se encuentra la piedra-llave en el jugador")
+	end
 
 	-- Cada monstruo se puede crear en la sala (nombres con tilde incluidos), y el golpe de
 	-- prueba (/nocthold golpe) mata a los normales de un golpe y quita un 25 % a los 3 jefes.
@@ -263,8 +314,17 @@ runChecks = function()
 	check(bossAddsTested[2] and bossAddsTested[4] and bossAddsTested[6], "no se probaron los refuerzos de los tres jefes")
 	check(r.stageName == "Completada", "estado final: " .. tostring(r.stageName))
 	check(not r.failed, "la expedición se marcó como fallida")
-	check(U.nextKey[fake.guid] == 8, "la llave no subió de 7 a 8: " .. tostring(U.nextKey[fake.guid]))
-	check(U.leave(fake) == true and U.run == nil, "salir al terminar no liberó la sala")
+	check(hasAid(U.layoutPos("finishPortal"), U.ITEM_PORTAL, U.AID_FINISH), "no apareció el portal de la última sala")
+	-- El jugador simulado no está en Game.getPlayers(): se sube su piedra a mano, como haría upgradeKey.
+	check(r.keyUpgradedTo == nil, "upgradeKey no debería encontrar a un jugador que no está conectado")
+	if fake.key then
+		U.setKeyLevel(U.findKeys(fake)[1], 8)
+		check(U.keyLevel(fake.key) == 8, "la piedra-llave no sube de 7 a 8")
+	end
+	check(U.stepFinish(fake) == true and U.run == nil, "el portal final no liberó la sala")
+	check(not hasAid(U.layoutPos("finishPortal"), U.ITEM_PORTAL, U.AID_FINISH), "el portal final no se quitó al vaciar la sala")
+	local arrival = U.layoutPos("arrival")
+	check(fake.position.x == arrival.x and fake.position.y == arrival.y, "el portal final no lleva a la entrada")
 
 	-- Ningún monstruo de la expedición se queda en la sala.
 	local leftovers = 0
@@ -273,19 +333,29 @@ runChecks = function()
 	end
 	check(leftovers == 0, leftovers .. " monstruos se quedaron en la sala")
 
-	-- Una segunda expedición arranca y reset la limpia.
-	check(U.enter(fake) == true and U.start(fake) == true, "no se pudo empezar una segunda expedición: " .. lastMessage())
+	-- Sin expedición nadie cruza la barrera; con una segunda en marcha, solo los suyos.
+	local stranger = newFake(arenaPos(9, 15), -4343)
+	check(not U.canPass(stranger) and not U.canPass(fake), "sin expedición la barrera debería cerrar el paso")
+	check(U.useAltar(fake) == true, "el altar no empezó una segunda expedición: " .. lastMessage())
+	check(U.run and U.run.keyLevel == 8, "la segunda expedición no usa la piedra de nivel 8")
+	check(U.canPass(fake) and not U.canPass(stranger), "la barrera deja pasar a quien no debe")
+	check(U.useAltar(stranger) == false, "el altar no debería dejar empezar otra expedición a la vez")
 	U.reset(true)
 	check(U.run == nil, "reset no liberó la sala")
+	check(not U.canPass(fake), "tras reset la barrera debería volver a cerrar")
+	if fake.key then fake.key:remove() end
 	finish()
 end
 
 local function runDungeon()
-	U.nextKey[fake.guid] = 7 -- llave 7: activa los dos afijos alfa
-	check(U.enter(fake) == true, "!nocthold enter falló: " .. lastMessage())
-	check(U.start(fake) == true, "!nocthold start falló: " .. lastMessage())
+	-- Desde el altar con la piedra de nivel 7 (activa los dos afijos alfa).
+	local stranger = newFake(arenaPos(9, 15), -4343)
+	check(U.useAltar(stranger) == false, "el altar no debería abrir sin piedra-llave")
+	check(U.useAltar(fake) == true, "el altar no empezó la expedición: " .. lastMessage())
 	local r = U.run
-	if not check(r and r.stage == 1, "no empezó la fase 1") then return finish() end
+	if not check(r and r.stage == 1 and r.keyLevel == 7, "no empezó la fase 1 con llave 7") then return finish() end
+	local s = U.layout.start[1]
+	check(fake.position.x == arenaPos(s[1], s[2]).x, "el altar no llevó al líder dentro")
 	check(r.remaining == 5, "fase 1 con llave 7 debería tener 5 enemigos (4 + afijo), tiene " .. tostring(r.remaining))
 	addEvent(guarded("tick", tick), 1500)
 end

@@ -67,6 +67,8 @@ function Game.createNpcType(_) npcCount = npcCount + 1; return genericObject() e
 function Game.getSpectators() return {} end
 function CreatureEvent(_) return genericObject() end
 function GlobalEvent(_) return genericObject() end
+function MoveEvent() return genericObject() end
+function Action() return genericObject() end
 function TalkAction(words) local o = genericObject(); state[o].talkAction = words; return o end
 NpcHandler = setmetatable({}, { __index = function() return function() return genericObject() end end })
 KeywordHandler = setmetatable({}, { __index = function() return function() return genericObject() end end })
@@ -92,7 +94,7 @@ assert(#monsterFiles == 7 and monsterCount == 7, "Expected seven MonsterType scr
 assert(loadfile(root .. "/npc/nocthold_npcs.lua"))()
 assert(npcCount == 5, "Expected five NpcType registrations, got " .. npcCount)
 assert(loadfile(root .. "/scripts/nocthold/runtime/encounter_runtime.lua"))()
-assert(loadfile(root .. "/scripts/nocthold/runtime/adventure_commands.lua"))()
+assert(loadfile(root .. "/scripts/nocthold/runtime/dungeon_entrance.lua"))()
 assert(loadfile(root .. "/scripts/nocthold/nocthold_admin.lua"))()
 assert(loadfile(root .. "/scripts/nocthold/test_damage.lua"))()
 do
@@ -169,17 +171,42 @@ assert(bosses == 3, "expected three bosses with phases, got " .. bosses)
 NOCTHOLD_DUNGEON.spawnBossAdd = realSpawnBossAdd
 
 -- NPC: saludo, cada palabra clave (también en plural) y la respuesta por defecto.
+local givenKeys = {}
+NOCTHOLD_DUNGEON.giveKey = function(player, level) givenKeys[#givenKeys + 1] = level return {} end
+local npcPlayer = { getId = function() return 77 end }
 assert(#npcHandlers == 5, "expected five NPC handlers, got " .. #npcHandlers)
 for _, handler in ipairs(npcHandlers) do
     local callbacks = state[handler].callbacks
     assert(callbacks[101] and callbacks[102], "NPC without greet or message callback")
-    assert(callbacks[101]({}, {}) == true, "NPC greet fails")
-    for _, message in ipairs({ "mazmorra", "llaves", "forja", "trabajo", "hola que tal" }) do
+    assert(callbacks[101]({}, npcPlayer) == true, "NPC greet fails")
+    for _, message in ipairs({ "mazmorra", "llaves", "forja", "estado", "trabajo", "hola que tal" }) do
         lastNpcSay = nil
-        assert(callbacks[102]({}, {}, 1, message) == true, "NPC reply fails for '" .. message .. "'")
+        assert(callbacks[102]({}, npcPlayer, 1, message) == true, "NPC reply fails for '" .. message .. "'")
         assert(type(lastNpcSay) == "string" and #lastNpcSay > 0, "NPC said nothing for '" .. message .. "'")
+        assert(not lastNpcSay:find("!nocthold"), "NPC still tells players to use a command: " .. lastNpcSay)
     end
 end
+
+-- El Cronista da la piedra-llave: "llave" pregunta el nivel y el número la da; "llave 3" de una vez.
+local function say(handler, message)
+    lastNpcSay = nil
+    state[handler].callbacks[102]({}, npcPlayer, 1, message)
+    return lastNpcSay or ""
+end
+local cronista, archivista = npcHandlers[5], npcHandlers[3]
+givenKeys = {}
+say(cronista, "llave")
+assert(#givenKeys == 0, "the Cronista gave a key before hearing the level")
+say(cronista, "5")
+assert(givenKeys[1] == 5, "the Cronista did not give a level 5 key")
+say(cronista, "llave 3")
+assert(givenKeys[2] == 3, "the Cronista did not give a key with 'llave 3'")
+assert(say(cronista, "llave 12"):find("0 al 10") and #givenKeys == 2, "the Cronista must refuse levels over 10")
+say(cronista, "7")
+assert(givenKeys[3] == 7, "after a refused level the Cronista should still wait for a number")
+say(cronista, "9")
+assert(#givenKeys == 3, "a bare number without asking should not give a key")
+assert(say(archivista, "estado"):find("expedici"), "the Archivista must report the dungeon state")
 
 -- La prueba dentro del servidor (selftest.lua) comprueba que Canary tiene todas las constantes
 -- que usan nuestros archivos: su lista tiene que estar completa.
