@@ -1,19 +1,42 @@
 -- Nocthold 1.0.0-alpha.1: La Forja Caida runtime encounter controller.
 -- Canary 3.6.1 / Revscriptsys. One shared test arena; NOT isolated multi-party instances.
--- Build the dynamic floor as GOD with: !nocthold buildmap
+-- La sala se genera sola al arrancar y el jugador no usa comandos: portal junto al templo,
+-- piedra-llave del Cronista, altar, barrera y portales de salida (ver dungeon_entrance.lua).
 
 NOCTHOLD_DUNGEON = NOCTHOLD_DUNGEON or {}
 local U = NOCTHOLD_DUNGEON
 U.version = "1.0.0-alpha.1"
 U.origin = Position(64000, 64000, 7)
 U.mapReady = U.mapReady or false
-U.nextKey = U.nextKey or {}
 U.run = U.run or nil
 U.tracked = U.tracked or {}
 U.token = U.token or 0
 
 local function pos(dx, dy)
     return Position(U.origin.x + dx, U.origin.y + dy, U.origin.z)
+end
+U.pos = pos
+
+-- Puntos de la sala (relativos a U.origin). La entrada (x 0-10) es la sala de los NPC.
+U.layout = {
+    arrival = {5, 16},            -- donde aparece quien llega por el portal del templo
+    exitPortal = {0, 15},         -- portal de la entrada que lleva de vuelta al templo
+    altar = {5, 10},              -- altar donde el lider usa su piedra-llave
+    barrier = {12, 14, 16},       -- x, y desde, y hasta: solo pasan los de la expedicion
+    start = { {14,15}, {15,15}, {16,15}, {14,14}, {14,16} }, -- donde empieza el grupo
+    finishPortal = {79, 15},      -- portal que aparece en la ultima sala al terminar
+}
+
+function U.layoutPos(name)
+    local p = U.layout[name]
+    return pos(p[1], p[2])
+end
+
+-- Esta dentro de la sala generada (entrada incluida) o solo de la parte con monstruos.
+function U.isInsideArena(position, dungeonOnly)
+    if not position or position.z ~= U.origin.z then return false end
+    local dx, dy = position.x - U.origin.x, position.y - U.origin.y
+    return dx >= (dungeonOnly and U.layout.barrier[1] or 0) and dx <= 80 and dy >= 0 and dy <= 30
 end
 
 local function tell(player, message)
@@ -55,18 +78,15 @@ end
 
 U.rects = rects -- funcion: la prueba automatica (selftest.lua) recorre las mismas casillas
 
-function U.buildMap(player)
+-- Pone el suelo de la sala y los 5 NPC. Lo llama dungeon_entrance.lua al arrancar el
+-- servidor con el suelo del templo. Devuelve true o false y un texto para el log.
+function U.buildMap(floorId)
     if U.mapReady then
-        tell(player, "El mapa dinamico ya esta construido en esta sesion.")
-        return true
+        return true, "La sala ya estaba construida."
     end
-    local sourceTile = Tile(player:getPosition())
-    local ground = sourceTile and sourceTile:getGround() or nil
-    if not ground then
-        tell(player, "No se pudo leer el suelo bajo tus pies. Pisa una casilla normal y repite.")
-        return false
+    if not floorId then
+        return false, "No hay suelo que copiar."
     end
-    local floorId = ground:getId()
     local created, failed = 0, 0
     for _, r in ipairs(rects()) do
         for x = r[1], r[3] do
@@ -89,8 +109,7 @@ function U.buildMap(player)
         end
     end
     if failed > 0 then
-        tell(player, "Mapa incompleto: " .. created .. " casillas preparadas y " .. failed .. " fallos. Revisa el log antes de entrar.")
-        return false
+        return false, "Sala incompleta: " .. created .. " casillas preparadas y " .. failed .. " fallos."
     end
     local npcSpawns = {
         {"Capitana Elira", 3, 12},
@@ -102,13 +121,11 @@ function U.buildMap(player)
     for _, data in ipairs(npcSpawns) do
         local npc = Game.createNpc(data[1], pos(data[2], data[3]), true, true)
         if not npc then
-            print("[NOCTHOLD] No se pudo crear NPC: " .. data[1] .. ". Comprueba que su NpcType carga.")
+            return false, "No se pudo crear el NPC " .. data[1] .. ". Comprueba que su NpcType carga."
         end
     end
     U.mapReady = true
-    tell(player, "La Forja Caida se ha generado: " .. created .. " casillas y cinco puntos de NPC. Zona: X=64000, Y=64000, Z=7.")
-    tell(player, "Usa !nocthold enter para formar una expedicion.")
-    return true
+    return true, "La Forja Caida se ha generado: " .. created .. " casillas y cinco NPC (X=64000, Y=64000, Z=7)."
 end
 
 local function collectParty(player)
@@ -128,18 +145,16 @@ local function collectParty(player)
     return list
 end
 
-local function saveReturn(player)
-    local p = player:getPosition()
-    return { x = p.x, y = p.y, z = p.z }
-end
-
-function U.enter(player)
+-- Reserva la sala para el grupo del lider con una llave de ese nivel. Lo usa el altar
+-- (dungeon_entrance.lua), justo antes de U.start. Entran ya los del grupo que estan en la
+-- sala de entrada; los demas pueden venir despues por el portal del templo y la barrera.
+function U.enter(player, level)
     if not U.mapReady then
-        tell(player, "El mapa aun no esta construido. Un GOD debe ejecutar !nocthold buildmap.")
+        tell(player, "La Forja Caida aun no esta preparada. Avisa a un administrador.")
         return false
     end
     if U.run then
-        tell(player, "La Forja Caida esta reservada por otra expedicion. Solo se permite una run simultanea en esta arena alfa.")
+        tell(player, "La Forja Caida esta ocupada por otra expedicion. Espera a que termine.")
         return false
     end
     local members = collectParty(player)
@@ -148,8 +163,8 @@ function U.enter(player)
         tell(player, "La expedicion admite un maximo de cinco jugadores.")
         return false
     end
+    level = math.max(0, math.min(10, math.floor(tonumber(level) or 0)))
     U.token = U.token + 1
-    local level = U.nextKey[player:getGuid()] or 0
     U.run = {
         token = U.token,
         ownerGuid = player:getGuid(),
@@ -160,44 +175,33 @@ function U.enter(player)
         remaining = 0,
         startedAt = nil,
         timeLimit = math.max(600, 1500 - level * 30),
+        warned = {},
         failed = false,
         completed = false,
         emptySince = nil,
         completedAt = nil,
     }
-    local leaderPos = player:getPosition()
+    local slot = 0
     for _, member in ipairs(members) do
-        local mp = member:getPosition()
-        if mp.z ~= leaderPos.z or math.abs(mp.x - leaderPos.x) > 12 or math.abs(mp.y - leaderPos.y) > 12 then
-            U.run = nil
-            tell(player, "Todos los miembros deben estar conectados y a menos de 12 casillas del lider para entrar.")
-            return false
+        U.run.players[member:getGuid()] = true
+        local here = member:getGuid() == player:getGuid() or U.isInsideArena(member:getPosition())
+        if here then
+            slot = slot + 1
+            local p = U.layout.start[slot]
+            member:teleportTo(pos(p[1], p[2]))
+            tell(member, "Has entrado en La Forja Caida. Lider: " .. player:getName() .. ". Llave de nivel " .. level .. ".")
+        else
+            tell(member, "Tu grupo ha entrado en La Forja Caida. Cruza el portal junto al templo para unirte.")
         end
     end
-    for i, member in ipairs(members) do
-        local returnPos = saveReturn(member)
-        U.run.players[member:getGuid()] = returnPos
-        local offsets = { {5,15}, {4,15}, {6,15}, {5,14}, {5,16} }
-        member:teleportTo(pos(offsets[i][1], offsets[i][2]))
-        tell(member, "Has entrado en La Forja Caida. Lider: " .. player:getName() .. ". Dificultad: " .. level .. ".")
-    end
-    tell(player, "Expedicion reservada para " .. #members .. " jugador(es). Habla con el Cronista o usa !nocthold start.")
     return true
 end
 
-function U.rejoin(player)
-    if not U.run then
-        tell(player, "No hay ninguna expedicion activa.")
-        return false
-    end
-    local guid = player:getGuid()
-    if not U.run.players[guid] then
-        tell(player, "No figuras entre los miembros de esta expedicion.")
-        return false
-    end
-    player:teleportTo(pos(5, 15))
-    tell(player, "Te has reincorporado a La Forja Caida.")
-    return true
+-- Cualquiera de la expedicion (o un GOD) cruza la barrera de la entrada; los demas no.
+function U.canPass(player)
+    if player:getGroup():getAccess() then return true end
+    local r = U.run
+    return r ~= nil and r.startedAt ~= nil and r.players[player:getGuid()] == true
 end
 
 function U.leave(player)
@@ -206,14 +210,13 @@ function U.leave(player)
         return false
     end
     local guid = player:getGuid()
-    local entry = U.run.players[guid]
-    if not entry then
+    if not U.run.players[guid] then
         tell(player, "No formas parte de esta expedicion.")
         return false
     end
-    player:teleportTo(Position(entry.x, entry.y, entry.z))
+    player:teleportTo(U.layoutPos("arrival"))
     U.run.players[guid] = nil
-    tell(player, "Has abandonado La Forja Caida.")
+    tell(player, "Has salido de La Forja Caida.")
     local count = 0
     for _ in pairs(U.run.players) do count = count + 1 end
     if count == 0 then
@@ -284,19 +287,26 @@ local function startStage(index)
         end
         U.run.stageName = "Completada"
         if not r.failed then
-            U.nextKey[r.ownerGuid] = math.min(10, r.keyLevel + 1)
-            U.tellGroup("La llave del lider mejora a nivel " .. U.nextKey[r.ownerGuid] .. ".")
+            local newLevel = math.min(10, r.keyLevel + 1)
+            if U.upgradeKey and U.upgradeKey(r.ownerGuid, newLevel) then
+                r.keyUpgradedTo = newLevel
+                U.tellGroup("La piedra-llave del lider sube a nivel " .. newLevel .. ".")
+            else
+                U.tellGroup("El lider no lleva su piedra-llave encima: esta vez no sube de nivel.")
+            end
         else
-            U.tellGroup("La llave no mejora porque se agoto el tiempo.")
+            U.tellGroup("La piedra-llave no sube porque se agoto el tiempo.")
         end
-        U.tellGroup("Podeis salir con !nocthold leave. Si seguis dentro, volvereis a la entrada en 90 segundos.")
+        if U.openFinishPortal then U.openFinishPortal() end
+        U.tellGroup("Cruzad el portal de la ultima sala para volver a la entrada. Si seguis dentro, volvereis solos en 90 segundos.")
         return
     end
     r.stage = index
     r.stageName = stages[index].name
     r.remaining = 0
     U.tracked = {}
-    U.tellGroup("Encuentro " .. index .. "/" .. #stages .. ": " .. r.stageName .. ".")
+    local left = r.startedAt and math.max(0, r.timeLimit - (os.time() - r.startedAt)) or r.timeLimit
+    U.tellGroup("Encuentro " .. index .. "/" .. #stages .. ": " .. r.stageName .. ". Quedan " .. math.floor(left / 60) .. ":" .. string.format("%02d", left % 60) .. ".")
     local spawns = {}
     for _, spawn in ipairs(stages[index].spawns) do
         spawns[#spawns + 1] = spawn
@@ -321,7 +331,7 @@ end
 
 function U.start(player)
     local r = U.run
-    if not r then tell(player, "Primero usa !nocthold enter.") return false end
+    if not r then tell(player, "No hay ninguna expedicion reservada.") return false end
     if r.ownerGuid ~= player:getGuid() then tell(player, "Solo el lider que reservo la expedicion puede iniciarla.") return false end
     if r.startedAt then tell(player, "La expedicion ya esta en marcha.") return false end
     r.startedAt = os.time()
@@ -351,11 +361,15 @@ function U.onMonsterDeath(creature)
     return true
 end
 
-function U.status(player)
-    if not U.run then tell(player, "No hay ninguna expedicion activa.") return true end
+function U.statusText()
     local r = U.run
+    if not r then return "Ahora mismo no hay ninguna expedicion en La Forja Caida." end
     local elapsed = r.startedAt and (os.time() - r.startedAt) or 0
-    tell(player, "La Forja Caida | Llave " .. r.keyLevel .. " | Fase: " .. r.stageName .. " | Enemigos pendientes: " .. r.remaining .. " | Tiempo: " .. elapsed .. "/" .. r.timeLimit .. " s" .. (r.failed and " | TIEMPO AGOTADO" or ""))
+    return "La Forja Caida | Llave " .. r.keyLevel .. " | Fase: " .. r.stageName .. " | Enemigos pendientes: " .. r.remaining .. " | Tiempo: " .. elapsed .. "/" .. r.timeLimit .. " s" .. (r.failed and " | TIEMPO AGOTADO" or "")
+end
+
+function U.status(player)
+    tell(player, U.statusText())
     return true
 end
 
@@ -374,13 +388,15 @@ function U.reset(teleportPlayers)
     local r = U.run
     if not r then return end
     if teleportPlayers then
-        for guid, entry in pairs(r.players) do
+        -- Solo a los que siguen dentro de la mazmorra; quien esta en la ciudad se queda alli.
+        for guid in pairs(r.players) do
             local p = onlinePlayerByGuid(guid)
-            if p then
-                p:teleportTo(Position(entry.x, entry.y, entry.z))
+            if p and U.isInsideArena(p:getPosition(), true) then
+                p:teleportTo(U.layoutPos("arrival"))
             end
         end
     end
+    if U.closeFinishPortal then U.closeFinishPortal() end
     removeTrackedCreatures()
     U.run = nil
     U.tracked = {}
@@ -405,18 +421,18 @@ function clock.onThink(interval)
         return true
     end
 
-    local onlineGuids = {}
+    -- Si nadie de la expedicion esta conectado y dentro (entrada incluida) en 3 minutos,
+    -- la sala se libera para otro grupo.
+    local inside = 0
     for _, onlinePlayer in ipairs(Game.getPlayers()) do
-        onlineGuids[onlinePlayer:getGuid()] = true
+        if r.players[onlinePlayer:getGuid()] and U.isInsideArena(onlinePlayer:getPosition()) then
+            inside = inside + 1
+        end
     end
-    local onlineCount = 0
-    for guid in pairs(r.players) do
-        if onlineGuids[guid] then onlineCount = onlineCount + 1 end
-    end
-    if onlineCount == 0 then
+    if inside == 0 then
         r.emptySince = r.emptySince or now
-        if now - r.emptySince >= 120 then
-            print("[NOCTHOLD] Reset automatico: no quedan miembros conectados.")
+        if now - r.emptySince >= 180 then
+            print("[NOCTHOLD] Reset automatico: nadie de la expedicion sigue en La Forja Caida.")
             U.reset(false)
             return true
         end
@@ -426,6 +442,15 @@ function clock.onThink(interval)
 
     if r.startedAt and not r.completed and not r.failed then
         local elapsed = now - r.startedAt
+        local left = r.timeLimit - elapsed
+        if left <= r.timeLimit / 2 and not r.warned.half then
+            r.warned.half = true
+            U.tellGroup("Ha pasado la mitad del tiempo. Quedan " .. math.ceil(left / 60) .. " minutos.")
+        end
+        if left <= 60 and not r.warned.last then
+            r.warned.last = true
+            U.tellGroup("Queda un minuto.")
+        end
         if elapsed >= r.timeLimit then
             r.failed = true
             U.tellGroup("Se ha agotado el tiempo. Podeis terminar la mazmorra, pero la recompensa se reducira.")

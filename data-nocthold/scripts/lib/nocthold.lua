@@ -1,5 +1,5 @@
 -- Nocthold: datos comunes del datapack (se carga antes que scripts, monstruos y NPC).
--- Sirve para que el aviso de arranque y /nocthold status digan qué se ha cargado de verdad.
+-- Sirve para que el aviso de arranque diga qué se ha cargado de verdad.
 
 Nocthold = Nocthold or {}
 Nocthold.version = "1.0.0-alpha.1"

@@ -10,7 +10,7 @@ puntos para los jefes) y después se decora a mano en el RME.
 2. Ábrelo con cualquier editor de texto y cambia:
    - `nombre:` minúsculas, números y `_` (sin tildes ni espacios). Tiene que ser distinto en cada plano.
    - `origen:` la casilla X Y Z donde empieza el dibujo (esquina de arriba a la izquierda).
-     No puede pisar otro plano ni la sala de `!nocthold buildmap` (X 64000-64080, Y 64000-64030, piso 7).
+     No puede pisar otro plano ni la sala de La Forja Caída (X 64000-64080, Y 64000-64030, piso 7).
    - `suelo:` y `pared:` uno de los materiales de la tabla de abajo.
    - El dibujo, debajo de `plano:`.
 3. Desde la carpeta del repositorio, ejecuta:
