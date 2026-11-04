@@ -8,6 +8,8 @@ NOCTHOLD - cliente para Windows
 3. Escribe tu correo y tu contraseña y pulsa Login.
    La primera vez el cliente descarga los gráficos del juego (unos minutos).
    Las siguientes veces ya entra directo.
+4. No hace falta descargar el cliente otra vez cuando haya novedades:
+   al abrirlo, se actualiza solo y se reinicia.
 
 ¿Problemas? Mándanos el fichero .log que hay en esta carpeta.
 
