@@ -60,6 +60,22 @@ para que el script de aggro cree los monstruos y su zona invisible. El `.otbm` n
 Los puntos quedan en el mapa como *waypoints* con el nombre `<mapa>.<punto>`, por ejemplo
 `sala_prueba.jefe`. Desde Lua: `getWaypointPositionByName("sala_prueba.jefe")`.
 
+## Cofre del jefe final
+
+```
+grupo j: El Guardián de Hierro   # el jefe final es un grupo más (aquí, la 'j' del dibujo)
+cofre C: j                       # la 'C' del dibujo es donde sale el cofre al morir el grupo 'j'
+botin C: 3031 x50, 3035 x2       # lo que puede salir: IDs (con su cantidad), uno al azar por premio
+premios C: 1                     # cuántos objetos da (1-10; si no, 1)
+```
+
+Mientras vive el jefe, la casilla `C` es suelo normal. Cuando muere el último monstruo del grupo
+aparece un cofre del tesoro (que brilla) y se avisa a los que están dentro. Cualquiera lo abre
+usándolo, sin comandos, y **solo una vez**: reparte los premios a jugadores al azar de la party del que
+lo abre que estén dentro de la mazmorra, y desaparece. Si alguien no puede cargar su premio, se queda
+en el suelo. Vuelve a salir cuando se rehace la mazmorra y se mata otra vez al jefe.
+El botín solo admite objetos que se pueden coger. Código: `data-nocthold/scripts/nocthold/mapas_cofres.lua`.
+
 ## Zonas: varios suelos y paredes en un mismo mapa
 
 `suelo:` y `pared:` son los de todo el mapa. Para cambiarlos en una parte, se define una zona

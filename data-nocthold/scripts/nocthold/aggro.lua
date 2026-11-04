@@ -28,10 +28,23 @@ function alRecibirDano.onHealthChange(creature, attacker, primaryDamage, primary
 end
 alRecibirDano:register()
 
--- Al morir, el monstruo deja de contar en su grupo.
+-- Al morir, el monstruo deja de contar en su grupo. Si era el último del grupo y el plano pone un
+-- cofre para ese grupo (el jefe final), aparece el cofre (scripts/nocthold/mapas_cofres.lua).
 local alMorir = CreatureEvent("NoctholdAggroMuerte")
 function alMorir.onDeath(creature)
+	local id = A.grupoDe(creature)
 	A.porMonstruo[creature:getId()] = nil
+	if id and A.grupos[id] then
+		local quedan = 0
+		for _, m in ipairs(A.monstruosVivos(id)) do
+			if m:getId() ~= creature:getId() then
+				quedan = quedan + 1
+			end
+		end
+		if quedan == 0 and Nocthold.cofres then
+			Nocthold.cofres.alVaciarGrupo(id)
+		end
+	end
 	return true
 end
 alMorir:register()

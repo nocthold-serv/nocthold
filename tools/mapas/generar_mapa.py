@@ -99,7 +99,7 @@ def leer_plano(texto, origen_fichero="plano"):
     filas son las del plano principal ("plano:", en el piso de 'origen'). Los otros pisos
     ("plano 6:", "plano 8:"...) van en opciones["pisos"], con las filas tal como están escritas."""
     opciones = {"paredes_auto": "si", "grupos": {}, "radios": {}, "puntos": {}, "destinos": {},
-                "zonas": {}, "objetos": {}, "capas": {}, "subidas": {}, "exteriores": {}, "pisos": {}}
+                "zonas": {}, "objetos": {}, "capas": {}, "subidas": {}, "exteriores": {}, "pisos": {}, "cofres": {}}
     filas = None
     capas = None  # las capas del plano que se está leyendo
     actual = None  # la lista donde van las filas que se leen ahora (un plano o una capa)
@@ -151,6 +151,29 @@ def leer_plano(texto, origen_fichero="plano"):
                 opciones["zonas"][letra] = _leer_zona(valor, f"{origen_fichero}:{numero}")
             else:
                 opciones["objetos"][letra] = _leer_objeto(valor, f"{origen_fichero}:{numero}")
+            continue
+        if len(partes) == 2 and partes[0] in ("cofre", "botin", "botín", "premios"):
+            letra = linea.split(":", 1)[0].split()[1]
+            if len(letra) != 1 or not (letra.isdigit() or "A" <= letra <= "Z") or letra in "EP":
+                raise ErrorPlano(f"{origen_fichero}:{numero}: '{partes[0]}' es para una mayúscula o un número del plano "
+                                 f"({partes[0]} C: ...)")
+            cofre = opciones["cofres"].setdefault(letra, {"grupo": None, "botin": [], "premios": 1, "linea": numero})
+            if partes[0] == "cofre":
+                if len(valor) != 1 or not ("a" <= valor <= "z"):
+                    raise ErrorPlano(f"{origen_fichero}:{numero}: 'cofre {letra}:' lleva la letra minúscula del grupo del jefe "
+                                     f"(cofre {letra}: j)")
+                cofre["grupo"] = valor
+            elif partes[0] == "premios":
+                if not valor.isdigit() or not (1 <= int(valor) <= 10):
+                    raise ErrorPlano(f"{origen_fichero}:{numero}: los premios son cuántos objetos da el cofre, de 1 a 10")
+                cofre["premios"] = int(valor)
+            else:
+                for trozo in valor.split(","):
+                    botin = re.fullmatch(r"\s*(\d+)(?:\s*x\s*(\d+))?\s*", trozo, re.I)
+                    if not botin or (botin.group(2) and not (1 <= int(botin.group(2)) <= 100)):
+                        raise ErrorPlano(f"{origen_fichero}:{numero}: el botín es una lista de IDs con su cantidad si hace "
+                                         f"falta, separados por comas (botin {letra}: 3043 x5, 7368)")
+                    cofre["botin"].append((int(botin.group(1)), int(botin.group(2) or 1)))
             continue
         if len(partes) == 2 and partes[0] in ("destino", "punto", "subida"):
             letra = linea.split(":", 1)[0].split()[1]
@@ -365,6 +388,18 @@ def generar(opciones, filas, materiales, origen_fichero="plano"):
     for letra in subidas:
         if letra in opciones.get("destinos", {}) or letra in opciones.get("puntos", {}):
             raise ErrorPlano(f"{origen_fichero}: '{letra}' no puede ser a la vez una subida y un portal o un punto")
+    for letra, cofre in opciones.get("cofres", {}).items():
+        if letra in subidas or letra in opciones.get("destinos", {}):
+            raise ErrorPlano(f"{origen_fichero}: '{letra}' no puede ser a la vez un cofre y una subida o un portal")
+        if not cofre["grupo"]:
+            raise ErrorPlano(f"{origen_fichero}: falta 'cofre {letra}: <letra del grupo del jefe>'")
+        if not cofre["botin"]:
+            raise ErrorPlano(f"{origen_fichero}: falta 'botin {letra}: ...' (qué objetos pueden salir del cofre)")
+        for item_id, _ in cofre["botin"]:
+            if item_id not in juego:
+                raise ErrorPlano(f"{origen_fichero}: botin {letra}: el ID {item_id} no existe en el juego")
+            if not juego[item_id].get("se_coge"):
+                raise ErrorPlano(f"{origen_fichero}: botin {letra}: el ID {item_id} no se puede coger (no puede ser un premio)")
 
     # Pisos: el del plano principal y los de "plano 6:", "plano 8:"... Todos van casilla a casilla con
     # el plano principal (sus filas empiezan donde empezaría el plano principal con sus filas en blanco).
@@ -612,6 +647,18 @@ def generar(opciones, filas, materiales, origen_fichero="plano"):
         for letra in opciones.get(clave, {}):
             if letra not in grupos:
                 raise ErrorPlano(f"{origen_fichero}: hay '{clave[:-1]} {letra}:' pero ninguna '{letra}' en el dibujo")
+    cofres = []
+    for letra, cofre in sorted(opciones.get("cofres", {}).items()):
+        if len(marcas.get(letra, [])) != 1:
+            raise ErrorPlano(f"{origen_fichero}: el cofre '{letra}' tiene que estar exactamente una vez en el dibujo "
+                             f"(está {len(marcas.get(letra, []))})")
+        if cofre["grupo"] not in grupos:
+            raise ErrorPlano(f"{origen_fichero}: 'cofre {letra}: {cofre['grupo']}' pero no hay ninguna '{cofre['grupo']}' "
+                             "(el grupo del jefe) en el dibujo")
+        x, y, z = marcas[letra][0]
+        if (x, y, z) in extra:
+            raise ErrorPlano(f"{origen_fichero}: el cofre '{letra}' necesita una casilla libre, sin objetos")
+        cofres.append({"pos": (x, y, z), "grupo": cofre["grupo"], "botin": cofre["botin"], "premios": cofre["premios"]})
     for letra in subidas:
         if not any(letra in celdas[z].values() for z in zs):
             raise ErrorPlano(f"{origen_fichero}: hay 'subida {letra}:' pero ninguna '{letra}' en el dibujo")
@@ -632,6 +679,7 @@ def generar(opciones, filas, materiales, origen_fichero="plano"):
                            "posiciones": grupos[letra]}
                    for letra in sorted(grupos)},
         "portales": portales,
+        "cofres": cofres,
         "subidas": subidas_info,
         "paredes_en": paredes,
         "listadas": listadas,
@@ -674,6 +722,7 @@ def lua_de(mapas):
         "-- Las casillas de otro piso que el de z llevan z = N. El exterior (relleno de alrededor) no se lista.",
         "-- relleno: pisos con exterior, que llega hasta las esquinas de ocupa. subidas: {rampa, a dónde se sale arriba}.",
         "-- grupos: cada letra minúscula del plano es un grupo de monstruos (un pull); posiciones = dónde va cada uno.",
+        "-- cofres: dónde aparece el cofre al morir entero su grupo (el jefe final), y qué puede dar ({ID, cantidad}).",
         "",
         "-- Se suma a Nocthold.mapas (puede haber otro fichero igual con mapas que no están en el repositorio).",
         "",
@@ -704,6 +753,13 @@ def lua_de(mapas):
             lineas.append("\t\tsubidas = {")
             for (rx, ry, rz), (sx, sy, sz) in info["subidas"]:
                 lineas.append(f"\t\t\t{{{{{rx}, {ry}, {rz}}}, {{{sx}, {sy}, {sz}}}}},")
+            lineas.append("\t\t},")
+        if info.get("cofres"):
+            lineas.append("\t\tcofres = {")
+            for cofre in info["cofres"]:
+                x, y, zz = cofre["pos"]
+                botin = ", ".join(f"{{{i}, {n}}}" for i, n in cofre["botin"])
+                lineas.append(f'\t\t\t{{{x}, {y}, {zz}, grupo = "{cofre["grupo"]}", premios = {cofre["premios"]}, botin = {{{botin}}}}},')
             lineas.append("\t\t},")
         lineas.append("\t\tgrupos = {")
         for letra, g in info["grupos"].items():

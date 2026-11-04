@@ -101,6 +101,30 @@ class Plano(unittest.TestCase):
         })
         self.assertEqual(info["suelos"], 12)  # los monstruos van sobre suelo normal
 
+    def test_cofre_del_jefe(self):
+        texto = plano("E..j.C\n......\n", **{"grupo j": "El Guardián de Hierro", "cofre C": "j",
+                                              "botin C": "3031 x50, 3035", "premios C": "2"})
+        m, info = generar(texto)
+        self.assertEqual(info["cofres"], [{"pos": (1005, 1000, 7), "grupo": "j", "botin": [(3031, 50), (3035, 1)], "premios": 2}])
+        self.assertEqual(m.tiles[(1005, 1000, 7)].items, [])  # el cofre lo pone el servidor al morir el jefe
+        lua = gm.lua_de([(m, {**info, "exterior": 0, "relleno": []})]).decode()
+        self.assertIn('{1005, 1000, 7, grupo = "j", premios = 2, botin = {{3031, 50}, {3035, 1}}}', lua)
+        casos = {
+            texto.replace("cofre C: j", "cofre C: k"): "ninguna 'k'",
+            texto.replace("cofre C: j", "cofre C: J"): "letra minúscula",
+            texto.replace("cofre C: j\n", ""): "falta 'cofre C:",
+            texto.replace("botin C: 3031 x50, 3035\n", ""): "falta 'botin C:",
+            texto.replace("3035", "1956"): "no se puede coger",
+            texto.replace("3035", "3035 x500"): "lista de IDs",
+            texto.replace("premios C: 2", "premios C: 0"): "de 1 a 10",
+            texto.replace("E..j.C", "E..jCC"): "exactamente una vez",
+        }
+        for mal, mensaje in casos.items():
+            with self.subTest(mensaje=mensaje):
+                with self.assertRaises(gm.ErrorPlano) as e:
+                    generar(mal)
+                self.assertIn(mensaje, str(e.exception))
+
     def test_portales(self):
         m, info = generar(plano("ES.T\n..K.\n", **{"destino S": "templo", "destino T": "jefe1", "punto K": "jefe1"}))
         salida = m.tiles[(1001, 1000, 7)].items

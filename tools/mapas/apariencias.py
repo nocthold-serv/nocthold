@@ -38,14 +38,14 @@ def _campos(buf):
 
 
 def leer_objetos(ruta):
-    """{id: {"suelo": bool, "bloquea": bool}} de todos los objetos (no outfits ni efectos)."""
+    """{id: {"suelo": bool, "bloquea": bool, "se_coge": bool}} de todos los objetos (no outfits ni efectos)."""
     with open(ruta, "rb") as f:
         datos = memoryview(f.read())
     objetos = {}
     for campo, tipo, valor in _campos(datos):
         if campo != 1 or tipo != 2:  # 1 = object
             continue
-        info = {"suelo": False, "bloquea": False}
+        info = {"suelo": False, "bloquea": False, "se_coge": False}
         ident = None
         for c, t, v in _campos(valor):
             if c == 1 and t == 0:
@@ -56,6 +56,8 @@ def leer_objetos(ruta):
                         info["suelo"] = True
                     elif fc == 13 and ft == 0 and fv:  # unpass
                         info["bloquea"] = True
+                    elif fc == 18 and ft == 0 and fv:  # take: se puede coger y llevar encima
+                        info["se_coge"] = True
         if ident is not None:
             objetos[ident] = info
     return objetos

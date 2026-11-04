@@ -174,6 +174,10 @@ function A.prepararMapa(nombre)
 	end
 	table.sort(letras)
 
+	-- Mazmorra rehecha: el cofre del jefe de la vez anterior (si nadie lo abrió) se va.
+	if Nocthold.cofres then
+		Nocthold.cofres.quitarDe(nombre)
+	end
 	local grupos, total = 0, 0
 	for _, letra in ipairs(letras) do
 		local datos = mapa.grupos[letra]
