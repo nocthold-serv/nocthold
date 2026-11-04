@@ -7,6 +7,11 @@ origen: 64000 64100 7
 suelo: piedra gris
 pared: piedra
 paredes_auto: si
+# Lo de alrededor se rellena de tierra (con un charco de brea, en la capa de zonas) para que no se vea
+# el fondo vacío. El piso de arriba (plano 6) es una salita a la que se sube por la rampa R.
+exterior: tierra
+rampa: piedra
+subida R: norte
 
 # S: portal de vuelta al templo. T: portal del jefe a la entrada.
 destino S: templo
@@ -27,7 +32,7 @@ PPPPPPP
 ###+###
    .
    .
-.......
+......R
 ...1...
 .......
    .
@@ -44,9 +49,9 @@ capa zonas:
 
 
 
-
-
-
+         nnn
+         nnnn
+          nn
 
 
 
@@ -68,3 +73,16 @@ capa objetos:
 
 
               p
+
+plano 6:
+
+
+    ......
+    ...A..
+    ......
+    ......
+     ...
+capa objetos:
+
+
+    h

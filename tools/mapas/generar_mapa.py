@@ -30,6 +30,8 @@ Debajo del plano puede haber dos capas, casilla a casilla con él (ver README.md
     capa zonas:    letras de "zona X: suelo <material>, pared <material>"
     capa objetos:  letras de "objeto X: <IDs>" o "objeto X: pared <ID horizontal> <ID vertical>"
 Los suelos con borde (agua, brea, barro...) ponen su borde en las casillas de alrededor.
+Con "exterior: <suelo>" se rellena lo de alrededor del dibujo (sin fondo vacío). Otros pisos van en
+"plano 6:", "plano 8:"..., y "subida R: norte" pone una rampa en R que sube al piso de arriba.
 """
 
 import argparse
@@ -54,7 +56,7 @@ PORTAL = 1949
 AID_TEMPLO = 45200
 
 # Zona reservada para la sala de La Forja Caída que se genera al arrancar (encounter_runtime.lua).
-ZONA_BUILDMAP = (64000, 64000, 64080, 64030, 7)
+ZONA_BUILDMAP = (64000, 64000, 64080, 64030, [7])
 
 # Va en la descripción de cada .otbm generado (se ve en el RME, en las propiedades del mapa).
 MARCA = "(generado por tools/mapas/generar_mapa.py)"
@@ -62,6 +64,13 @@ MARCA = "(generado por tools/mapas/generar_mapa.py)"
 VACIO = " ~"
 SUELO = ".PE+#"  # caracteres con significado fijo; el resto de letras/números son puntos
 CAPAS = ("zonas", "objetos")  # dibujos extra debajo del plano, con las mismas filas y columnas
+
+# Subidas entre pisos ("subida R: norte"): hacia dónde se camina para subir, en (columnas, filas).
+DIRECCIONES = {"norte": (0, -1), "sur": (0, 1), "este": (1, 0), "oeste": (-1, 0)}
+# Escalera de bajada (es un suelo): va en el piso de arriba, justo encima de la rampa. Como el pincel del RME.
+BAJADA = 469
+# Casillas de exterior alrededor del dibujo por defecto ("margen: N"): un poco más de lo que se ve en pantalla.
+MARGEN = 10
 
 # Qué objetos bloquean el paso: lo dice el catálogo del cliente (appearances.dat).
 APARIENCIAS = os.path.join(RAIZ, "data", "items", "appearances.dat")
@@ -85,21 +94,42 @@ def cargar_materiales():
 
 
 def leer_plano(texto, origen_fichero="plano"):
-    """Devuelve (opciones, filas) de un plano. Lanza ErrorPlano con la línea del fallo."""
+    """Devuelve (opciones, filas) de un plano. Lanza ErrorPlano con la línea del fallo.
+
+    filas son las del plano principal ("plano:", en el piso de 'origen'). Los otros pisos
+    ("plano 6:", "plano 8:"...) van en opciones["pisos"], con las filas tal como están escritas."""
     opciones = {"paredes_auto": "si", "grupos": {}, "radios": {}, "puntos": {}, "destinos": {},
-                "zonas": {}, "objetos": {}, "capas": {}}
+                "zonas": {}, "objetos": {}, "capas": {}, "subidas": {}, "exteriores": {}, "pisos": {}}
     filas = None
-    actual = None  # la lista donde van las filas que se leen ahora (el plano o una capa)
+    capas = None  # las capas del plano que se está leyendo
+    actual = None  # la lista donde van las filas que se leen ahora (un plano o una capa)
     for numero, linea in enumerate(texto.splitlines(), start=1):
-        if filas is not None:
+        nuevo_plano = re.fullmatch(r"\s*plano(?:\s+(\d+))?\s*:\s*", linea)
+        if nuevo_plano:
+            if nuevo_plano.group(1) is None:
+                if filas is not None:
+                    raise ErrorPlano(f"{origen_fichero}:{numero}: hay dos 'plano:' (los otros pisos son 'plano 6:', 'plano 8:'...)")
+                filas = actual = []
+                capas = opciones["capas"]
+            else:
+                z = int(nuevo_plano.group(1))
+                if not (0 <= z <= 15):
+                    raise ErrorPlano(f"{origen_fichero}:{numero}: el piso tiene que estar entre 0 y 15")
+                if z in opciones["pisos"]:
+                    raise ErrorPlano(f"{origen_fichero}:{numero}: el piso {z} está dos veces")
+                piso = opciones["pisos"][z] = {"filas": [], "capas": {}, "linea": numero}
+                actual = piso["filas"]
+                capas = piso["capas"]
+            continue
+        if actual is not None:
             capa = re.fullmatch(r"\s*capa\s+(\S+)\s*:\s*", linea)
             if capa:
                 nombre_capa = capa.group(1).lower()
                 if nombre_capa not in CAPAS:
                     raise ErrorPlano(f"{origen_fichero}:{numero}: capa '{nombre_capa}' desconocida (hay: {', '.join(CAPAS)})")
-                if nombre_capa in opciones["capas"]:
-                    raise ErrorPlano(f"{origen_fichero}:{numero}: la capa '{nombre_capa}' está dos veces")
-                actual = opciones["capas"][nombre_capa] = []
+                if nombre_capa in capas:
+                    raise ErrorPlano(f"{origen_fichero}:{numero}: la capa '{nombre_capa}' está dos veces en el mismo plano")
+                actual = capas[nombre_capa] = []
                 continue
             if "\t" in linea:
                 raise ErrorPlano(f"{origen_fichero}:{numero}: hay un tabulador en el plano; usa espacios")
@@ -112,9 +142,6 @@ def leer_plano(texto, origen_fichero="plano"):
             raise ErrorPlano(f"{origen_fichero}:{numero}: no entiendo '{limpia}' (falta 'clave: valor' o 'plano:')")
         clave, valor = (p.strip() for p in limpia.split(":", 1))
         clave = clave.lower()
-        if clave == "plano":
-            filas = actual = []
-            continue
         partes = clave.split()
         if len(partes) == 2 and partes[0] in ("zona", "objeto"):
             letra = linea.split(":", 1)[0].split()[1]
@@ -125,19 +152,23 @@ def leer_plano(texto, origen_fichero="plano"):
             else:
                 opciones["objetos"][letra] = _leer_objeto(valor, f"{origen_fichero}:{numero}")
             continue
-        if len(partes) == 2 and partes[0] == "destino":
+        if len(partes) == 2 and partes[0] in ("destino", "punto", "subida"):
             letra = linea.split(":", 1)[0].split()[1]
             if len(letra) != 1 or not (letra.isdigit() or "A" <= letra <= "Z") or letra in "EP":
-                raise ErrorPlano(f"{origen_fichero}:{numero}: 'destino' es para una mayúscula o un número del plano (destino S: templo)")
-            opciones["destinos"][letra] = valor
-            continue
-        if len(partes) == 2 and partes[0] == "punto":
-            letra = linea.split(":", 1)[0].split()[1]
-            if len(letra) != 1 or not (letra.isdigit() or "A" <= letra <= "Z") or letra in "EP":
-                raise ErrorPlano(f"{origen_fichero}:{numero}: 'punto' es para una mayúscula o un número del plano (punto K: jefe1)")
-            if not valor.replace("_", "").isalnum() or not valor.isascii():
-                raise ErrorPlano(f"{origen_fichero}:{numero}: el nombre del punto solo puede llevar letras sin tilde, números y _")
-            opciones["puntos"][letra] = valor.lower()
+                raise ErrorPlano(f"{origen_fichero}:{numero}: '{partes[0]}' es para una mayúscula o un número del plano "
+                                 f"({partes[0]} K: ...)")
+            if partes[0] == "destino":
+                opciones["destinos"][letra] = valor
+            elif partes[0] == "subida":
+                direccion = valor.lower()
+                if direccion not in DIRECCIONES:
+                    raise ErrorPlano(f"{origen_fichero}:{numero}: la subida va hacia {', '.join(DIRECCIONES)} "
+                                     "(hacia donde se camina para subir)")
+                opciones["subidas"][letra] = direccion
+            else:
+                if not valor.replace("_", "").isalnum() or not valor.isascii():
+                    raise ErrorPlano(f"{origen_fichero}:{numero}: el nombre del punto solo puede llevar letras sin tilde, números y _")
+                opciones["puntos"][letra] = valor.lower()
             continue
         if len(partes) == 2 and partes[0] in ("grupo", "radio"):
             letra = partes[1]
@@ -150,7 +181,17 @@ def leer_plano(texto, origen_fichero="plano"):
                     raise ErrorPlano(f"{origen_fichero}:{numero}: el radio tiene que ser un número de casillas entre 1 y 15")
                 opciones["radios"][letra] = int(valor)
             continue
-        if clave not in ("nombre", "origen", "suelo", "pared", "paredes_auto"):
+        if partes and partes[0] == "exterior" and len(partes) <= 2:
+            if len(partes) == 2 and not (partes[1].isdigit() and 0 <= int(partes[1]) <= 15):
+                raise ErrorPlano(f"{origen_fichero}:{numero}: 'exterior 6: ...' lleva el número de un piso")
+            opciones["exteriores"][int(partes[1]) if len(partes) == 2 else None] = valor.lower()
+            continue
+        if clave == "margen":
+            if not valor.isdigit() or not (0 <= int(valor) <= 30):
+                raise ErrorPlano(f"{origen_fichero}:{numero}: el margen es un número de casillas entre 0 y 30")
+            opciones["margen"] = int(valor)
+            continue
+        if clave not in ("nombre", "origen", "suelo", "pared", "paredes_auto", "rampa"):
             raise ErrorPlano(f"{origen_fichero}:{numero}: opción desconocida '{clave}'")
         opciones[clave] = valor
     if filas is None:
@@ -163,8 +204,9 @@ def leer_plano(texto, origen_fichero="plano"):
         quitadas += 1
     if not filas:
         raise ErrorPlano(f"{origen_fichero}: el plano está vacío")
-    # Cada capa va casilla a casilla con el plano tal como está escrito (con sus filas en blanco de
-    # arriba): así una capa también llega a las paredes automáticas de la fila de encima del dibujo.
+    # Cada capa (y cada plano de otro piso) va casilla a casilla con el plano principal tal como está
+    # escrito, con sus filas en blanco de arriba: así una capa también llega a las paredes automáticas
+    # de la fila de encima del dibujo, y los pisos quedan unos encima de otros.
     opciones["desplazamiento_capas"] = quitadas
     for clave in ("nombre", "origen", "suelo", "pared"):
         if clave not in opciones:
@@ -181,8 +223,9 @@ def _leer_zona(valor, donde):
             continue
         tipo, _, material = trozo.partition(" ")
         tipo = tipo.lower()
-        if tipo not in ("suelo", "pared") or not material.strip():
-            raise ErrorPlano(f"{donde}: una zona es 'suelo <material>' y/o 'pared <material>', separados por comas")
+        if tipo not in ("suelo", "pared", "rampa") or not material.strip():
+            raise ErrorPlano(f"{donde}: una zona es 'suelo <material>', 'pared <material>' y/o 'rampa <material>', "
+                             "separados por comas")
         if tipo in zona:
             raise ErrorPlano(f"{donde}: la zona dice dos veces '{tipo}'")
         zona[tipo] = material.strip().lower()
@@ -295,8 +338,14 @@ def generar(opciones, filas, materiales, origen_fichero="plano"):
             raise ErrorPlano(f"{donde}: pared '{nombre_pared}' desconocida. Hay: {', '.join(materiales['paredes'])}")
         return materiales["paredes"][nombre_pared]
 
-    # Zona "por defecto" (la de las opciones suelo: y pared:) y las de "zona X:".
-    defecto = {"suelo": opciones["suelo"].lower(), "pared": opciones["pared"].lower()}
+    def rampa_de(nombre_rampa, donde):
+        if nombre_rampa not in materiales.get("rampas", {}):
+            raise ErrorPlano(f"{donde}: rampa '{nombre_rampa}' desconocida. Hay: {', '.join(materiales.get('rampas', {}))}")
+        return materiales["rampas"][nombre_rampa]
+
+    # Zona "por defecto" (la de las opciones suelo:, pared: y rampa:) y las de "zona X:".
+    defecto = {"suelo": opciones["suelo"].lower(), "pared": opciones["pared"].lower(),
+               "rampa": opciones.get("rampa", "piedra").lower()}
     zonas = {None: defecto}
     for letra, zona in opciones.get("zonas", {}).items():
         zonas[letra] = {**defecto, **zona}
@@ -304,6 +353,7 @@ def generar(opciones, filas, materiales, origen_fichero="plano"):
         donde = origen_fichero if letra is None else f"{origen_fichero}: zona {letra}"
         suelo_de(zona["suelo"], donde)
         pared_de(zona["pared"], donde)
+        rampa_de(zona["rampa"], donde)
     objetos_def = opciones.get("objetos", {})
     juego = objetos_del_juego()
     for letra, obj in objetos_def.items():
@@ -311,62 +361,136 @@ def generar(opciones, filas, materiales, origen_fichero="plano"):
             if item_id not in juego:
                 raise ErrorPlano(f"{origen_fichero}: objeto {letra}: el ID {item_id} no existe en el juego")
     auto = opciones.get("paredes_auto", "si").lower() in ("si", "sí", "s", "yes", "true", "1")
+    subidas = opciones.get("subidas", {})
+    for letra in subidas:
+        if letra in opciones.get("destinos", {}) or letra in opciones.get("puntos", {}):
+            raise ErrorPlano(f"{origen_fichero}: '{letra}' no puede ser a la vez una subida y un portal o un punto")
 
-    celdas = {}  # (col, fila) -> carácter
-    for f, linea in enumerate(filas):
-        for c, ch in enumerate(linea):
-            if ch in VACIO:
-                continue
-            if not (ch in SUELO or ch.isdigit() or ("A" <= ch <= "Z") or ("a" <= ch <= "z")):
-                raise ErrorPlano(f"{origen_fichero}: fila {f + 1}, columna {c + 1}: no conozco el carácter '{ch}'")
-            celdas[(c, f)] = ch
+    # Pisos: el del plano principal y los de "plano 6:", "plano 8:"... Todos van casilla a casilla con
+    # el plano principal (sus filas empiezan donde empezaría el plano principal con sus filas en blanco).
+    desplazamiento = opciones.get("desplazamiento_capas", 0)
+    pisos = [(oz, filas, 0, opciones.get("capas", {}))]
+    for z, piso in sorted(opciones.get("pisos", {}).items()):
+        if z == oz:
+            raise ErrorPlano(f"{origen_fichero}: 'plano {z}:' es el piso del plano principal (el de 'origen')")
+        pisos.append((z, piso["filas"], -desplazamiento, piso["capas"]))
+    zs = [z for z, *_ in pisos]
 
-    def capa(nombre_capa, definidas, que):
+    def donde_en(z, texto):
+        return f"{origen_fichero}: {texto}" if z == oz else f"{origen_fichero}: piso {z}, {texto}"
+
+    celdas = {}  # z -> {(col, fila): carácter}
+    capa_zonas, capa_objetos = {}, {}
+
+    def capa(z, capas, nombre_capa, definidas, que):
         dibujo = {}
-        for f, linea in enumerate(opciones.get("capas", {}).get(nombre_capa, []), start=-opciones.get("desplazamiento_capas", 0)):
+        for f, linea in enumerate(capas.get(nombre_capa, []), start=-desplazamiento):
             for c, ch in enumerate(linea):
                 if ch in VACIO:
                     continue
                 if ch not in definidas:
-                    raise ErrorPlano(f"{origen_fichero}: capa {nombre_capa}, fila {f + 1}, columna {c + 1}: "
-                                     f"'{ch}' no tiene '{que} {ch}:'")
+                    raise ErrorPlano(donde_en(z, f"capa {nombre_capa}, fila {f + 1}, columna {c + 1}: '{ch}' no tiene '{que} {ch}:'"))
                 dibujo[(c, f)] = ch
         return dibujo
-
-    capa_zonas = capa("zonas", zonas, "zona")
-    capa_objetos = capa("objetos", objetos_def, "objeto")
 
     def transitable(ch):
         return ch is not None and ch not in "#+"
 
-    if auto:
-        for (c, f), ch in list(celdas.items()):
-            if not transitable(ch):
-                continue
-            for dc in (-1, 0, 1):
-                for dr in (-1, 0, 1):
-                    vecina = (c + dc, f + dr)
-                    if vecina not in celdas:
-                        celdas[vecina] = "#"
+    for z, filas_piso, inicio, capas in pisos:
+        dibujo = celdas[z] = {}
+        for f, linea in enumerate(filas_piso, start=inicio):
+            for c, ch in enumerate(linea):
+                if ch in VACIO:
+                    continue
+                if not (ch in SUELO or ch.isdigit() or ("A" <= ch <= "Z") or ("a" <= ch <= "z")):
+                    raise ErrorPlano(donde_en(z, f"fila {f + 1}, columna {c + 1}: no conozco el carácter '{ch}'"))
+                dibujo[(c, f)] = ch
+        if not dibujo:
+            raise ErrorPlano(donde_en(z, "el plano de este piso está vacío"))
+        capa_zonas[z] = capa(z, capas, "zonas", zonas, "zona")
+        capa_objetos[z] = capa(z, capas, "objetos", objetos_def, "objeto")
+        if auto:
+            for (c, f), ch in list(dibujo.items()):
+                if not transitable(ch):
+                    continue
+                for dc in (-1, 0, 1):
+                    for dr in (-1, 0, 1):
+                        vecina = (c + dc, f + dr)
+                        if vecina not in dibujo:
+                            dibujo[vecina] = "#"
 
-    def zona_en(c, f):
+    def zona_en(z, c, f):
         """La zona de la casilla; una pared sin zona dibujada toma la de un suelo vecino."""
-        if (c, f) in capa_zonas:
-            return zonas[capa_zonas[(c, f)]]
-        if celdas.get((c, f)) in ("#", "+"):
+        if (c, f) in capa_zonas[z]:
+            return zonas[capa_zonas[z][(c, f)]]
+        if celdas[z].get((c, f)) in ("#", "+"):
             for dc, dr in ((0, -1), (-1, 0), (1, 0), (0, 1), (-1, -1), (1, -1), (-1, 1), (1, 1)):
                 vecina = (c + dc, f + dr)
-                if transitable(celdas.get(vecina)) and vecina in capa_zonas:
-                    return zonas[capa_zonas[vecina]]
+                if transitable(celdas[z].get(vecina)) and vecina in capa_zonas[z]:
+                    return zonas[capa_zonas[z][vecina]]
         return defecto
 
-    # Suelo de cada casilla que no es pared (las paredes no dan ni reciben bordes).
-    material_en = {(c, f): zona_en(c, f)["suelo"] for (c, f), ch in celdas.items() if ch not in "#+"}
+    # Exterior: lo que rodea el dibujo (hasta 'margen' casillas más allá) se rellena con un suelo, para que
+    # no se vea el fondo vacío. "exterior: tierra" vale para todos los pisos; "exterior 6: nada" lo quita en uno.
+    margen = opciones.get("margen", MARGEN)
+    todas = [cf for z in zs for cf in celdas[z]]
+    c1, c2 = min(c for c, _ in todas) - margen, max(c for c, _ in todas) + margen
+    f1, f2 = min(f for _, f in todas) - margen, max(f for _, f in todas) + margen
+    exteriores = opciones.get("exteriores", {})
+    exterior = {}  # z -> {(col, fila)} casillas de exterior
+    material_fuera = {}  # z -> suelo del exterior
+    for z in zs:
+        material = exteriores.get(z, exteriores.get(None, "nada"))
+        if material in ("nada", "ninguno", "no"):
+            exterior[z] = set()
+            continue
+        suelo_de(material, donde_en(z, "exterior"))
+        exterior[z] = {(c, f) for f in range(f1, f2 + 1) for c in range(c1, c2 + 1) if (c, f) not in celdas[z]}
+        material_fuera[z] = material
+
+    def material_exterior(z, cf):
+        """El exterior toma el suelo de la zona dibujada en la capa de zonas o, si no hay, el de 'exterior:'."""
+        letra = capa_zonas[z].get(cf)
+        return zonas[letra]["suelo"] if letra is not None else material_fuera[z]
+
+    # Suelo de cada casilla que no es pared (las paredes no dan ni reciben bordes), también el exterior.
+    material_en = {}
+    for z in zs:
+        material_en[z] = {cf: zona_en(z, *cf)["suelo"] for cf, ch in celdas[z].items() if ch not in "#+"}
+        for cf in exterior[z]:
+            material_en[z][cf] = material_exterior(z, cf)
     bordes = materiales.get("bordes", {})
 
-    for (c, f) in capa_objetos:
-        if (c, f) not in celdas:
-            raise ErrorPlano(f"{origen_fichero}: capa objetos, fila {f + 1}, columna {c + 1}: hay un objeto fuera del mapa")
+    for z in zs:
+        for (c, f) in capa_objetos[z]:
+            if (c, f) not in celdas[z] and (c, f) not in exterior[z]:
+                raise ErrorPlano(donde_en(z, f"capa objetos, fila {f + 1}, columna {c + 1}: hay un objeto fuera del mapa"))
+
+    # Subidas: la rampa en este piso, su pie en la casilla de antes y, en el piso de arriba, la escalera de
+    # bajada (un suelo) justo encima; al subir se sale a la casilla siguiente de arriba.
+    poner = {}  # (z, col, fila) -> [IDs que se añaden]
+    suelo_forzado = {}  # (z, col, fila) -> ID de suelo
+    subidas_info = []
+    for z in zs:
+        for (c, f), ch in celdas[z].items():
+            if ch not in subidas:
+                continue
+            dc, df = DIRECCIONES[subidas[ch]]
+            donde = donde_en(z, f"fila {f + 1}, columna {c + 1}: la subida '{ch}'")
+            if z - 1 not in celdas:
+                raise ErrorPlano(f"{donde} necesita un 'plano {z - 1}:' (el piso de arriba)")
+            arriba = celdas[z - 1]
+            if arriba.get((c, f)) not in (".", "P"):
+                raise ErrorPlano(f"{donde} necesita suelo libre ('.') justo encima, en el piso {z - 1}")
+            if not transitable(arriba.get((c + dc, f + df))):
+                raise ErrorPlano(f"{donde} necesita suelo en el piso {z - 1} hacia {subidas[ch]} (donde se sale al subir)")
+            if not transitable(celdas[z].get((c - dc, f - df))):
+                raise ErrorPlano(f"{donde} necesita suelo delante (de donde se viene para subir)")
+            rampa = materiales["rampas"][zona_en(z, c, f)["rampa"]][subidas[ch]]
+            poner.setdefault((z, c, f), []).append(rampa[0])
+            poner.setdefault((z, c - dc, f - df), []).append(rampa[1])
+            suelo_forzado[(z - 1, c, f)] = BAJADA
+            subidas_info.append(((ox + c, oy + f, z), (ox + c + dc, oy + f + df, z - 1)))
 
     m = otbm.Map()
     m.description = f"Nocthold: {nombre} {MARCA}"
@@ -375,69 +499,89 @@ def generar(opciones, filas, materiales, origen_fichero="plano"):
     m.house_file = f"{nombre}-house.xml"
     m.zone_file = f"{nombre}-zones.xml"
 
-    def es_muro(c, f):
-        return celdas.get((c, f)) in ("#", "+")
-
     puntos = []
     contadores = {}
     grupos = {}  # letra -> [(x, y, z), ...]
-    marcas = {}  # mayúscula o número -> [(x, y), ...] (para los portales)
+    marcas = {}  # mayúscula o número -> [(x, y, z), ...] (para los portales)
     extra = {}  # (x, y, z) -> {"objetos": [ids de decoración], "bloquea": bool}
-    for (c, f) in sorted(celdas, key=lambda k: (k[1], k[0])):
-        ch = celdas[(c, f)]
-        x, y = ox + c, oy + f
-        if not (0 <= x <= 65535 and 0 <= y <= 65535):
-            raise ErrorPlano(f"{origen_fichero}: la casilla {x},{y} se sale del mapa (0-65535)")
-        zona = zona_en(c, f)
-        suelo = _suelo_en(x, y, materiales["suelos"][zona["suelo"]])
-        t = otbm.Tile(x, y, oz, ground=suelo)
-        pieza = None
-        if ch in "#+":
-            pared = materiales["paredes"][zona["pared"]]
-            pieza = _orientacion(es_muro(c, f - 1), es_muro(c - 1, f), es_muro(c + 1, f), es_muro(c, f + 1), pared)
-            if ch == "#":
-                t.items.append(_variante(x, y, pared[pieza]))
-            else:
-                clave = {"horizontal": "puerta_horizontal", "vertical": "puerta_vertical"}.get(pieza)
-                if clave is None:
-                    raise ErrorPlano(f"{origen_fichero}: fila {f + 1}, columna {c + 1}: la puerta tiene que estar en medio de "
-                                     "una pared recta (pared a los dos lados)")
-                if clave not in pared:
-                    raise ErrorPlano(f"{origen_fichero}: la pared '{zona['pared']}' no tiene puertas")
-                t.items.append(_variante(x, y, pared[clave]))
-        elif ch == "P":
-            t.flags |= otbm.FLAG_PROTECTIONZONE
-        elif "a" <= ch <= "z":
-            grupos.setdefault(ch, []).append((x, y, oz))
-        elif ch != ".":
-            marcas.setdefault(ch, []).append((x, y))
-            base = opciones.get("puntos", {}).get(ch) or {"E": "entrada", "J": "jefe"}.get(ch, ch.lower())
-            contadores[base] = contadores.get(base, 0) + 1
-            punto = base if contadores[base] == 1 else f"{base}{contadores[base]}"
-            puntos.append((punto, x, y, oz))
-        decoracion = [] if ch in "#+" else _bordes(material_en, c, f, bordes)
-        if (c, f) in capa_objetos:
-            letra = capa_objetos[(c, f)]
-            obj = objetos_def[letra]
-            donde = f"{origen_fichero}: capa objetos, fila {f + 1}, columna {c + 1}"
-            if obj["pared"]:
-                if ch != "#" or pieza not in ("horizontal", "vertical"):
-                    raise ErrorPlano(f"{donde}: el objeto de pared '{letra}' tiene que ir en una pared recta")
-                decoracion.append(obj["ids"][0 if pieza == "horizontal" else 1])
-            else:
-                if ch in "#+":
-                    raise ErrorPlano(f"{donde}: el objeto '{letra}' va en el suelo, no en una pared "
-                                     "(para las paredes: 'objeto X: pared <ID horizontal> <ID vertical>')")
-                decoracion.append(_variante(x, y, obj["ids"]))
-        t.items.extend(decoracion)
-        # Casilla de suelo que no se puede pisar: agua profunda, una columna, una estatua...
-        bloquea = juego.get(suelo, {}).get("bloquea", False) or any(juego[i]["bloquea"] for i in decoracion)
-        if bloquea and ch not in "#+.P":
-            raise ErrorPlano(f"{origen_fichero}: fila {f + 1}, columna {c + 1}: '{ch}' está en una casilla que no se "
-                             "puede pisar (suelo u objeto que bloquea el paso)")
-        if decoracion or (bloquea and ch not in "#+"):
-            extra[(x, y, oz)] = {"objetos": decoracion, "bloquea": bloquea or ch in "#+"}
-        m.add(t)
+    paredes = set()
+    listadas = set()
+    for z in zs:
+        def es_muro(c, f):
+            return celdas[z].get((c, f)) in ("#", "+")
+
+        for (c, f) in sorted(set(celdas[z]) | exterior[z], key=lambda k: (k[1], k[0])):
+            ch = celdas[z].get((c, f))
+            x, y = ox + c, oy + f
+            if not (0 <= x <= 65535 and 0 <= y <= 65535):
+                raise ErrorPlano(f"{origen_fichero}: la casilla {x},{y} se sale del mapa (0-65535)")
+            donde = donde_en(z, f"fila {f + 1}, columna {c + 1}")
+            if ch is None:
+                # Exterior: suelo, bordes y objetos, sin más comprobaciones (no se llega andando).
+                t = otbm.Tile(x, y, z, ground=_suelo_en(x, y, materiales["suelos"][material_exterior(z, (c, f))]))
+                t.items.extend(_bordes(material_en[z], c, f, bordes))
+                if (c, f) in capa_objetos[z]:
+                    obj = objetos_def[capa_objetos[z][(c, f)]]
+                    if obj["pared"]:
+                        raise ErrorPlano(f"{donde}: el objeto de pared '{capa_objetos[z][(c, f)]}' tiene que ir en una pared recta")
+                    t.items.append(_variante(x, y, obj["ids"]))
+                m.add(t)
+                continue
+            zona = zona_en(z, c, f)
+            suelo = suelo_forzado.get((z, c, f)) or _suelo_en(x, y, materiales["suelos"][zona["suelo"]])
+            t = otbm.Tile(x, y, z, ground=suelo)
+            pieza = None
+            if ch in "#+":
+                pared = materiales["paredes"][zona["pared"]]
+                pieza = _orientacion(es_muro(c, f - 1), es_muro(c - 1, f), es_muro(c + 1, f), es_muro(c, f + 1), pared)
+                if ch == "#":
+                    t.items.append(_variante(x, y, pared[pieza]))
+                else:
+                    clave = {"horizontal": "puerta_horizontal", "vertical": "puerta_vertical"}.get(pieza)
+                    if clave is None:
+                        raise ErrorPlano(f"{donde}: la puerta tiene que estar en medio de una pared recta (pared a los dos lados)")
+                    if clave not in pared:
+                        raise ErrorPlano(f"{origen_fichero}: la pared '{zona['pared']}' no tiene puertas")
+                    t.items.append(_variante(x, y, pared[clave]))
+                paredes.add((x, y, z))
+            elif ch == "P":
+                t.flags |= otbm.FLAG_PROTECTIONZONE
+            elif "a" <= ch <= "z":
+                grupos.setdefault(ch, []).append((x, y, z))
+            elif ch != "." and ch not in subidas:
+                marcas.setdefault(ch, []).append((x, y, z))
+                base = opciones.get("puntos", {}).get(ch) or {"E": "entrada", "J": "jefe"}.get(ch, ch.lower())
+                contadores[base] = contadores.get(base, 0) + 1
+                punto = base if contadores[base] == 1 else f"{base}{contadores[base]}"
+                puntos.append((punto, x, y, z))
+            decoracion = [] if ch in "#+" else _bordes(material_en[z], c, f, bordes)
+            decoracion.extend(poner.get((z, c, f), []))
+            if (c, f) in capa_objetos[z]:
+                letra = capa_objetos[z][(c, f)]
+                obj = objetos_def[letra]
+                donde_obj = donde_en(z, f"capa objetos, fila {f + 1}, columna {c + 1}")
+                if obj["pared"]:
+                    if ch != "#" or pieza not in ("horizontal", "vertical"):
+                        raise ErrorPlano(f"{donde_obj}: el objeto de pared '{letra}' tiene que ir en una pared recta")
+                    decoracion.append(obj["ids"][0 if pieza == "horizontal" else 1])
+                else:
+                    if ch in "#+":
+                        raise ErrorPlano(f"{donde_obj}: el objeto '{letra}' va en el suelo, no en una pared "
+                                         "(para las paredes: 'objeto X: pared <ID horizontal> <ID vertical>')")
+                    if (z, c, f) in suelo_forzado:
+                        raise ErrorPlano(f"{donde_obj}: encima de una subida (la escalera de bajada) no puede haber objetos")
+                    decoracion.append(_variante(x, y, obj["ids"]))
+            t.items.extend(decoracion)
+            # Casilla de suelo que no se puede pisar: agua profunda, una columna, una estatua...
+            bloquea = juego.get(suelo, {}).get("bloquea", False) or any(juego[i]["bloquea"] for i in decoracion)
+            if bloquea and ch not in "#+.P":
+                raise ErrorPlano(f"{donde}: '{ch}' está en una casilla que no se puede pisar (suelo u objeto que bloquea el paso)")
+            if bloquea and ((z, c, f) in poner or (z, c, f) in suelo_forzado):
+                raise ErrorPlano(f"{donde}: una subida (o su pie, o la bajada de arriba) está en una casilla que no se puede pisar")
+            if decoracion or (bloquea and ch not in "#+"):
+                extra[(x, y, z)] = {"objetos": decoracion, "bloquea": bloquea or ch in "#+"}
+            m.add(t)
+            listadas.add((x, y, z))
 
     if contadores.get("entrada", 0) != 1:
         raise ErrorPlano(f"{origen_fichero}: el plano tiene que tener exactamente una E (entrada); tiene {contadores.get('entrada', 0)}")
@@ -457,35 +601,45 @@ def generar(opciones, filas, materiales, origen_fichero="plano"):
         else:
             raise ErrorPlano(f"{origen_fichero}: 'destino {letra}: {valor}' no es 'templo', ni X Y Z, "
                              f"ni un punto de este mapa ({', '.join(sorted(nombres))})")
-        for x, y in marcas[letra]:
-            if destino == (x, y, oz):
+        for x, y, z in marcas[letra]:
+            if destino == (x, y, z):
                 raise ErrorPlano(f"{origen_fichero}: el portal '{letra}' te manda a su propia casilla")
             item = otbm.Item(PORTAL, aid=AID_TEMPLO) if destino == "templo" else otbm.Item(PORTAL, destino)
-            m.tiles[(x, y, oz)].items.append(item)
-            portales.append((x, y, oz, destino))
+            m.tiles[(x, y, z)].items.append(item)
+            portales.append((x, y, z, destino))
 
     for clave in ("grupos", "radios"):
         for letra in opciones.get(clave, {}):
             if letra not in grupos:
                 raise ErrorPlano(f"{origen_fichero}: hay '{clave[:-1]} {letra}:' pero ninguna '{letra}' en el dibujo")
+    for letra in subidas:
+        if not any(letra in celdas[z].values() for z in zs):
+            raise ErrorPlano(f"{origen_fichero}: hay 'subida {letra}:' pero ninguna '{letra}' en el dibujo")
 
     m.waypoints = [(f"{nombre}.{p}", x, y, z) for p, x, y, z in puntos]
     xs = [t.x for t in m.tiles.values()]
     ys = [t.y for t in m.tiles.values()]
     m.width, m.height = max(xs) + 1, max(ys) + 1
-    paredes = {(ox + c, oy + f, oz) for (c, f), ch in celdas.items() if ch in "#+"}
+    lx = [x for x, _, _ in listadas]
+    ly = [y for _, y, _ in listadas]
     info = {
         "nombre": nombre,
-        "caja": (min(xs), min(ys), max(xs), max(ys), oz),
+        "caja": (min(lx), min(ly), max(lx), max(ly), oz),
+        "ocupa": (min(xs), min(ys), max(xs), max(ys)),
+        "pisos": sorted(zs),
         "puntos": puntos,
         "grupos": {letra: {"monstruo": opciones.get("grupos", {}).get(letra), "radio": opciones.get("radios", {}).get(letra),
                            "posiciones": grupos[letra]}
                    for letra in sorted(grupos)},
         "portales": portales,
+        "subidas": subidas_info,
         "paredes_en": paredes,
+        "listadas": listadas,
         "extra": extra,
-        "suelos": len(m.tiles) - len(paredes),
+        "suelos": len(listadas) - len(paredes),
         "paredes": len(paredes),
+        "exterior": len(m.tiles) - len(listadas),
+        "relleno": [z for z in sorted(zs) if exterior[z]],
     }
     return m, info
 
@@ -495,9 +649,10 @@ def _es_portal(item):
 
 
 def _solapan(a, b):
+    """a y b: (x1, y1, x2, y2, [pisos]). Se pisan si comparten algún piso y sus rectángulos se tocan."""
     ax1, ay1, ax2, ay2, az = a
     bx1, by1, bx2, by2, bz = b
-    return az == bz and ax1 <= bx2 and bx1 <= ax2 and ay1 <= by2 and by1 <= ay2
+    return bool(set(az) & set(bz)) and ax1 <= bx2 and bx1 <= ax2 and ay1 <= by2 and by1 <= ay2
 
 
 def ficheros_de(m, info, carpeta=SALIDA_MAPAS):
@@ -516,6 +671,8 @@ def lua_de(mapas):
         "-- Mapas de data-nocthold/world/custom/ hechos con el generador: puntos con nombre y, para la prueba",
         "-- automática (selftest.lua), lo que tiene que haber en cada casilla: {x, y, suelo, pared o 0, zona protegida}",
         "-- y, si tiene decoración o no se puede pisar: {..., {objetos de decoración}, bloquea el paso}.",
+        "-- Las casillas de otro piso que el de z llevan z = N. El exterior (relleno de alrededor) no se lista.",
+        "-- relleno: pisos con exterior, que llega hasta las esquinas de ocupa. subidas: {rampa, a dónde se sale arriba}.",
         "-- grupos: cada letra minúscula del plano es un grupo de monstruos (un pull); posiciones = dónde va cada uno.",
         "",
         "-- Se suma a Nocthold.mapas (puede haber otro fichero igual con mapas que no están en el repositorio).",
@@ -528,6 +685,12 @@ def lua_de(mapas):
         x1, y1, x2, y2, z = info["caja"]
         lineas.append(f'\t["{info["nombre"]}"] = {{')
         lineas.append(f"\t\tz = {z}, caja = {{{x1}, {y1}, {x2}, {y2}}}, suelos = {info['suelos']}, paredes = {info['paredes']},")
+        if len(info["pisos"]) > 1 or info["exterior"]:
+            pisos = ", ".join(str(p) for p in info["pisos"])
+            relleno = ", ".join(str(p) for p in info["relleno"])
+            ox1, oy1, ox2, oy2 = info["ocupa"]
+            lineas.append(f"\t\tpisos = {{{pisos}}}, exterior = {info['exterior']}, relleno = {{{relleno}}}, "
+                          f"ocupa = {{{ox1}, {oy1}, {ox2}, {oy2}}},")
         lineas.append("\t\tpuntos = {")
         for p, x, y, zz in info["puntos"]:
             lineas.append(f'\t\t\t["{p}"] = {{{x}, {y}, {zz}}},')
@@ -537,6 +700,11 @@ def lua_de(mapas):
             d = '"templo"' if destino == "templo" else f"{{{destino[0]}, {destino[1]}, {destino[2]}}}"
             lineas.append(f"\t\t\t{{{x}, {y}, {zz}, destino = {d}}},")
         lineas.append("\t\t},")
+        if info["subidas"]:
+            lineas.append("\t\tsubidas = {")
+            for (rx, ry, rz), (sx, sy, sz) in info["subidas"]:
+                lineas.append(f"\t\t\t{{{{{rx}, {ry}, {rz}}}, {{{sx}, {sy}, {sz}}}}},")
+            lineas.append("\t\t},")
         lineas.append("\t\tgrupos = {")
         for letra, g in info["grupos"].items():
             monstruo = f'"{g["monstruo"]}"' if g["monstruo"] else "nil"
@@ -545,17 +713,18 @@ def lua_de(mapas):
             lineas.append(f'\t\t\t["{letra}"] = {{monstruo = {monstruo}, radio = {radio}, posiciones = {{{posiciones}}}}},')
         lineas.append("\t\t},")
         lineas.append("\t\tcasillas = {")
-        for key in sorted(m.tiles, key=lambda k: (k[1], k[0])):
+        for key in sorted(info["listadas"], key=lambda k: (k[2] != z, k[2], k[1], k[0])):
             t = m.tiles[key]
+            otro_piso = "" if key[2] == z else f", z = {key[2]}"
             pz = "true" if t.flags & otbm.FLAG_PROTECTIONZONE else "false"
             objeto = otbm.item_id(t.items[0]) if key in info["paredes_en"] else 0
             extra = info["extra"].get(key)
             if extra:
                 objetos = ", ".join(str(i) for i in extra["objetos"])
                 bloquea = "true" if extra["bloquea"] else "false"
-                lineas.append(f"\t\t\t{{{t.x}, {t.y}, {t.ground}, {objeto}, {pz}, {{{objetos}}}, {bloquea}}},")
+                lineas.append(f"\t\t\t{{{t.x}, {t.y}, {t.ground}, {objeto}, {pz}, {{{objetos}}}, {bloquea}{otro_piso}}},")
             else:
-                lineas.append(f"\t\t\t{{{t.x}, {t.y}, {t.ground}, {objeto}, {pz}}},")
+                lineas.append(f"\t\t\t{{{t.x}, {t.y}, {t.ground}, {objeto}, {pz}{otro_piso}}},")
         lineas.append("\t\t},")
         lineas.append("\t},")
     lineas.append("}) do")
@@ -575,12 +744,13 @@ def generar_todo(carpeta=PLANOS, salida_mapas=SALIDA_MAPAS, salida_lua=SALIDA_LU
         with open(ruta, encoding="utf-8") as f:
             opciones, filas = leer_plano(f.read(), fichero)
         m, info = generar(opciones, filas, materiales, fichero)
-        if _solapan(info["caja"], ZONA_BUILDMAP):
+        ocupa = (*info["ocupa"], info["pisos"])
+        if _solapan(ocupa, ZONA_BUILDMAP):
             raise ErrorPlano(f"{fichero}: se mete en la sala de La Forja Caída (X 64000-64080, Y 64000-64030, Z 7)")
         for otro_m, otro in mapas:
             if otro["nombre"] == info["nombre"]:
                 raise ErrorPlano(f"{fichero}: ya hay otro plano con el nombre '{info['nombre']}'")
-            if _solapan(info["caja"], otro["caja"]):
+            if _solapan(ocupa, (*otro["ocupa"], otro["pisos"])):
                 raise ErrorPlano(f"{fichero}: se pisa con el mapa '{otro['nombre']}'; cambia el 'origen'")
         mapas.append((m, info))
     salida = {}
@@ -626,7 +796,7 @@ def main(argv=None):
     for m, info in mapas:
         x1, y1, x2, y2, z = info["caja"]
         print(f"{info['nombre']}: {info['suelos']} casillas de suelo y {info['paredes']} de pared, "
-              f"de {x1},{y1} a {x2},{y2} (piso {z}). Puntos: {', '.join(p for p, *_ in info['puntos'])}. "
+              f"de {x1},{y1} a {x2},{y2} (pisos {', '.join(str(p) for p in info['pisos'])}; {info['exterior']} de exterior). Puntos: {', '.join(p for p, *_ in info['puntos'])}. "
               f"Grupos: {len(info['grupos'])} ({sum(len(g['posiciones']) for g in info['grupos'].values())} monstruos).")
     print(f"Escritos en {salida_mapas}/ y {salida_lua}.")
     return 0

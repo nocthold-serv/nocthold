@@ -107,6 +107,51 @@ izquierda): las capas cuentan las filas tal como están escritas.
 
 La prueba del servidor revisa también cada objeto y si la casilla se pisa o no.
 
+## Exterior: nada de fondo vacío
+
+Sin más, alrededor del dibujo no hay nada y el cliente enseña el fondo vacío. Con `exterior:` todo
+lo de alrededor (hasta `margen:` casillas más allá del dibujo, 10 si no se dice; algo más de lo que
+cabe en pantalla) se rellena con un suelo:
+
+```
+exterior: tierra          # para todos los pisos
+exterior 6: agua profunda # otro suelo en el piso 6 (o "nada" para no rellenarlo)
+margen: 12
+```
+
+Las capas de zonas y objetos también valen fuera del dibujo: así se pinta el exterior (un mar de
+brea con islas de tierra, rocas, huesos...). Hace falta dejar filas en blanco arriba y columnas a la
+izquierda del plano para llegar a esa parte. Las casillas de exterior no se pisan (están detrás de
+las paredes) y no van a la lista del `.lua`; la prueba del servidor solo mira que el relleno llega
+a las esquinas.
+
+## Varios pisos y subidas
+
+Debajo del plano principal (el del piso de `origen`) puede haber otros pisos, cada uno con su
+dibujo y sus capas, casilla a casilla con el principal (las filas cuentan desde el principio del
+plano principal, con sus filas en blanco). En Tibia el piso 6 está encima del 7 y el 8 debajo.
+
+```
+rampa: piedra             # rampa de todo el mapa (una zona puede cambiarla: "zona m: rampa manos")
+subida R: norte           # R es una rampa: se camina hacia el norte para subir
+
+plano:
+ ....
+ ..R.
+ ....
+plano 6:
+   .
+   .
+capa objetos:
+   ...
+```
+
+En el piso de abajo va la rampa (en `R`) con su pie en la casilla de delante; justo encima, en
+el piso de arriba, el programa pone la escalera de bajada. Por eso arriba hace falta suelo libre
+encima de la `R` y en la casilla siguiente hacia donde se sube (por ahí se sale). Para bajar, se
+pisa la escalera de arriba. La prueba del servidor mira que la rampa sube, que encima hay bajada
+y que arriba se puede salir.
+
 ## Materiales
 
 Están en `materiales.json`. Para añadir uno, busca los IDs en el RME y añádelos ahí; el test
@@ -115,9 +160,12 @@ que las puertas se abren sin llave.
 
 - Suelos: `piedra gris`, `piedra`, `marmol negro`, `adoquin marron`, `tierra de cueva`, `templo mojado`,
   `templo mojado oscuro`, `marmol abisal`, `marmol abisal roto`, `agua somera`, `musgo`, `fango negro`,
-  `moho`, `losas oscuras`, `agua de sangre`; y sin pisar: `marea negra` (brea), `agua profunda`, `agua negra`.
+  `moho`, `losas oscuras`, `agua de sangre`, `tierra` (la de fuera de las cuevas, con su borde); y sin pisar:
+  `marea negra` (brea), `agua profunda`, `agua negra`.
 - Paredes: `piedra` (con puertas), `roca`, `piedra clara`, `piedra maciza`, `piedra oscura`, `huesos`, `manos`.
   Una pieza de pared con varios IDs es una lista de variantes.
+- Rampas: `piedra`, `tierra`, `gruta`, `musgo`, `barro`, `agrietada`, `manos`. El test comprueba en
+  `data/items/items.xml` que cada una sube hacia la dirección que dice.
 
 ## Diseños que no van al repositorio
 
@@ -154,7 +202,7 @@ python3 -m unittest discover -s tools/mapas -v
 
 ## Límites de este prototipo
 
-- Un piso por plano (sin escaleras entre pisos).
+- Entre pisos, solo rampas (nada de escaleras de mano ni agujeros con cuerda: necesitan usar objetos).
 - Sin monstruos ni NPC colocados en el mapa (los pone el script de la mazmorra).
 - Objetos de una sola casilla (nada de estatuas o sarcófagos de varias casillas).
 - Bordes solo de los suelos que tienen `bordes` en `materiales.json`.

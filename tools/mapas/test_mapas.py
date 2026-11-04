@@ -203,8 +203,67 @@ class Plano(unittest.TestCase):
                 self.assertIn(mensaje, str(e.exception))
 
     def test_no_pisa_la_sala_de_buildmap(self):
-        self.assertTrue(gm._solapan((64010, 63990, 64020, 64001, 7), gm.ZONA_BUILDMAP))
-        self.assertFalse(gm._solapan((64010, 63990, 64020, 64001, 6), gm.ZONA_BUILDMAP))
+        self.assertTrue(gm._solapan((64010, 63990, 64020, 64001, [7]), gm.ZONA_BUILDMAP))
+        self.assertTrue(gm._solapan((64010, 63990, 64020, 64001, [6, 7]), gm.ZONA_BUILDMAP))
+        self.assertFalse(gm._solapan((64010, 63990, 64020, 64001, [6]), gm.ZONA_BUILDMAP))
+
+    def test_exterior(self):
+        # Sin exterior solo están el dibujo y sus paredes.
+        m, info = generar(plano("E.\n"))
+        self.assertEqual(len(m.tiles), 12)
+        self.assertEqual(info["exterior"], 0)
+        # Con exterior, todo lo de alrededor hasta el margen tiene suelo, y no va a la lista del .lua.
+        m, info = generar(plano("E.\n", exterior="tierra", margen="2", **{"zona n": "suelo marea negra", "objeto h": "3114 3115 3116"}) + "capa zonas:\n" + "\n" * 2 + "    n\n"
+                          + "capa objetos:\n   h\n")
+        self.assertEqual(len(m.tiles), 8 * 7)
+        self.assertEqual(info["exterior"], 8 * 7 - 12)
+        self.assertEqual(info["ocupa"], (997, 997, 1004, 1003))
+        self.assertEqual(len(info["listadas"]), 12)
+        tierra = {i for i, _ in gm.cargar_materiales()["suelos"]["tierra"]}
+        self.assertIn(m.tiles[(997, 997, 7)].ground, tierra)
+        # La zona dibujada en el exterior cambia su suelo; la tierra pone su borde alrededor.
+        self.assertIn(m.tiles[(1004, 1002, 7)].ground, {i for i, _ in gm.cargar_materiales()["suelos"]["marea negra"]})
+        borde = set(gm.cargar_materiales()["bordes"]["tierra"].values())
+        self.assertTrue(borde & {otbm.item_id(i) for i in m.tiles[(1004, 1002, 7)].items})
+        # Y en el exterior también se ponen objetos.
+        self.assertIn(otbm.item_id(m.tiles[(1003, 1000, 7)].items[-1]), (3114, 3115, 3116))
+        with self.assertRaises(gm.ErrorPlano) as e:
+            generar(plano("E.\n", exterior="lava"))
+        self.assertIn("suelo 'lava' desconocido", str(e.exception))
+
+    def test_pisos_y_subidas(self):
+        texto = plano("E..R\n....\n", exterior="tierra", margen="1", **{"subida R": "norte", "zona m": "rampa manos"})
+        texto += "capa zonas:\n\n   m\n"
+        texto += "plano 6:\n   .\n   .\n"
+        texto = texto.replace("plano:\n", "plano:\n\n")
+        m, info = generar(texto)
+        self.assertEqual(info["pisos"], [6, 7])
+        rampa = gm.cargar_materiales()["rampas"]["manos"]["norte"]
+        # La rampa está en R; su pie, en la casilla de delante (de donde se viene).
+        self.assertEqual(otbm.item_id(m.tiles[(1003, 1000, 7)].items[-1]), rampa[0])
+        self.assertEqual(otbm.item_id(m.tiles[(1003, 1001, 7)].items[-1]), rampa[1])
+        # Encima, la escalera de bajada; al subir se sale una casilla al norte.
+        self.assertEqual(m.tiles[(1003, 1000, 6)].ground, gm.BAJADA)
+        self.assertEqual(info["subidas"], [((1003, 1000, 7), (1003, 999, 6))])
+        self.assertIn((1003, 999, 6), info["listadas"])
+        self.assertNotIn((1003, 1000, 7), [(x, y, z) for _, x, y, z in info["puntos"]])
+        # El piso de arriba también tiene exterior y paredes automáticas.
+        self.assertIn((1002, 998, 6), m.tiles)
+        casos = {
+            texto.replace("plano 6:\n   .\n   .\n", "plano 6:\n\n   .\n"): "piso 6 hacia norte",
+            texto.replace("plano 6:\n   .\n   .\n", "plano 6:\n   .\n   1\n"): "suelo libre",
+            texto.replace("plano 6:\n   .\n   .\n", "plano 5:\n   .\n   .\n"): "plano 6:",
+            texto.replace("subida R: norte", "subida R: arriba"): "la subida va hacia",
+            texto.replace("subida R: norte", "subida R: sur"): "piso 6 hacia sur",
+            texto.replace("E..R\n....\n", "E..R\n...\n"): "suelo delante",
+            texto.replace("plano 6:", "plano 7:"): "piso del plano principal",
+            texto + "plano 6:\n.\n": "dos veces",
+        }
+        for mal, mensaje in casos.items():
+            with self.subTest(mensaje=mensaje):
+                with self.assertRaises(gm.ErrorPlano) as e:
+                    generar(mal)
+                self.assertIn(mensaje, str(e.exception))
 
 
 class Materiales(unittest.TestCase):
@@ -232,6 +291,28 @@ class Materiales(unittest.TestCase):
                         self.assertIn(item_id, self.objetos)
                         self.assertTrue(self.objetos[item_id]["bloquea"])
                         self.assertFalse(self.objetos[item_id]["suelo"])
+
+    def test_rampas_suben_hacia_su_direccion(self):
+        # La rampa tiene que cambiar de piso (floorchange en data/items/items.xml) hacia donde dice.
+        with open(os.path.join(RAIZ, "data", "items", "items.xml"), encoding="utf-8") as f:
+            texto = f.read()
+        cambio = {}
+        for item_id, cuerpo in re.findall(r'<item id="(\d+)"[^>]*(?<!/)>((?:(?!<item).)*?)</item>', texto, re.S):
+            valor = re.search(r'key="floorchange" value="(\w+)"', cuerpo)
+            if valor:
+                cambio[int(item_id)] = valor.group(1)
+        en_ingles = {"norte": "north", "sur": "south", "este": "east", "oeste": "west"}
+        self.assertEqual(cambio.get(gm.BAJADA), "down")
+        self.assertTrue(self.objetos[gm.BAJADA]["suelo"])
+        for nombre, direcciones in self.materiales["rampas"].items():
+            self.assertEqual(set(direcciones), set(gm.DIRECCIONES), f"a la rampa '{nombre}' le faltan direcciones")
+            for direccion, (rampa, pie) in direcciones.items():
+                with self.subTest(rampa=nombre, direccion=direccion):
+                    self.assertEqual(cambio.get(rampa), en_ingles[direccion])
+                    self.assertNotIn(pie, cambio)
+                    for item_id in (rampa, pie):
+                        self.assertIn(item_id, self.objetos)
+                        self.assertFalse(self.objetos[item_id]["bloquea"])
 
     def test_puertas_abribles_sin_llave(self):
         # data/libs/tables/doors.lua dice qué puertas son "cerradas con llave" (lockedDoor):
