@@ -38,6 +38,7 @@ ATTR_DESCRIPTION = 1
 ATTR_TILE_FLAGS = 3
 ATTR_ACTION_ID = 4
 ATTR_UNIQUE_ID = 5
+ATTR_TELE_DEST = 8
 ATTR_ITEM = 9
 ATTR_EXT_SPAWN_MONSTER_FILE = 11
 ATTR_EXT_HOUSE_FILE = 13
@@ -54,6 +55,30 @@ FLAG_PVPZONE = 1 << 4
 OTBM_VERSION = 2
 ITEMS_MAJOR = 3
 ITEMS_MINOR = 57
+
+
+class Item(tuple):
+    """Objeto con atributos: destino de teletransporte (x, y, z) y/o action id.
+    Los objetos sin atributos se guardan como un número normal."""
+
+    def __new__(cls, item_id, dest=None, aid=0):
+        return super().__new__(cls, (item_id, tuple(dest) if dest else None, aid))
+
+    @property
+    def id(self):
+        return self[0]
+
+    @property
+    def dest(self):
+        return self[1]
+
+    @property
+    def aid(self):
+        return self[2]
+
+
+def item_id(item):
+    return item.id if isinstance(item, Item) else item
 
 
 class Tile:
@@ -180,9 +205,18 @@ def write(m):
             if t.ground:
                 w.u8(ATTR_ITEM)
                 w.u16(t.ground)
-            for item_id in t.items:
+            for item in t.items:
                 w.start(OTBM_ITEM)
-                w.u16(item_id)
+                w.u16(item_id(item))
+                if isinstance(item, Item):
+                    if item.aid:
+                        w.u8(ATTR_ACTION_ID)
+                        w.u16(item.aid)
+                    if item.dest:
+                        w.u8(ATTR_TELE_DEST)
+                        w.u16(item.dest[0])
+                        w.u16(item.dest[1])
+                        w.u8(item.dest[2])
                 w.end()
             w.end()
         w.end()
@@ -299,14 +333,26 @@ class _Reader:
         return s.decode("latin-1")
 
 
-def _item_id(node, where):
+def _read_item(node, where):
     r = _Reader(node.data)
-    item_id = r.u16()
-    # Los atributos de objeto (acción, texto, destino...) se ignoran: no los usamos.
+    ident = r.u16()
     for child in node.children:
         if child.type != OTBM_ITEM:
             raise ValueError(f"{where}: nodo {child.type} dentro de un objeto")
-    return item_id
+    # Se entienden el action id y el destino de teletransporte; al primer atributo distinto se para
+    # (texto, cargas... no los usa el generador y se pierden al reescribir).
+    dest, aid = None, 0
+    while r.left():
+        attr = r.data[r.pos]
+        if attr == ATTR_ACTION_ID and r.left() >= 3:
+            r.u8()
+            aid = r.u16()
+        elif attr == ATTR_TELE_DEST and r.left() >= 6:
+            r.u8()
+            dest = (r.u16(), r.u16(), r.u8())
+        else:
+            break
+    return Item(ident, dest, aid) if (dest or aid) else ident
 
 
 def read(data):
@@ -372,7 +418,7 @@ def read(data):
                         raise ValueError(f"{where}: atributo {attr} desconocido")
                 for child in tn.children:
                     if child.type == OTBM_ITEM:
-                        t.items.append(_item_id(child, where))
+                        t.items.append(_read_item(child, where))
                     elif child.type == 19:  # OTBM_TILE_ZONE: lo aceptamos pero no lo guardamos
                         continue
                     else:

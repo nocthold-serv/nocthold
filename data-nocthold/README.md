@@ -19,6 +19,7 @@ se actualice, no hay que fusionar una copia entera de `data-canary`.
 | `scripts/nocthold/nocthold_startup.lua` | Al arrancar escribe `[NOCTHOLD] OK ...` en el log | La comprobación de GitHub busca esa línea. |
 | `scripts/nocthold/nocthold_admin.lua` | `/nocthold status`, `spells`, `golpe` y `mapa` (solo god) | `/nocthold mapa [nombre]` lleva al GOD a la entrada de un mapa generado. |
 | `world/custom/` | Mapas `.otbm` generados con `tools/mapas/generar_mapa.py` a partir de planos de letras | Canary los carga solos al arrancar. De momento, `sala_prueba` (X 63999-64017, Y 64099-64116, piso 7). |
+| `scripts/nocthold/mapas_portales.lua` | Portal junto al templo hacia cada mapa generado y portales "al templo" dentro de los mapas | Sin comandos. Action ids 45200 en adelante. |
 | `scripts/lib/nocthold_mapas.lua` | Lista de mapas generados, sus puntos y lo que hay en cada casilla | GENERADO: no editar a mano. |
 
 ### Probar la mazmorra
