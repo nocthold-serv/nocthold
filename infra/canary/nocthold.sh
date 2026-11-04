@@ -21,6 +21,9 @@
 #   ./nocthold.sh test mapas <fichero.tar.gz>
 #                                mete mapas privados (no van a GitHub) en pruebas
 #                                y reinicia; sin fichero dice cuáles hay
+#   ./nocthold.sh test mundo <nombre|canary>
+#                                mapa principal de pruebas: uno privado (<nombre>.otbm del
+#                                paquete de mapas) o el de Canary; sin nombre dice cuál hay
 #   ./nocthold.sh prod <otro>    cualquier orden de "docker compose"
 #
 # La primera vez crea prod.env / test.env con contraseñas aleatorias.
@@ -395,8 +398,34 @@ case "$orden" in
 		echo "Reiniciando pruebas para cargarlos..."
 		"${compose[@]}" up -d --force-recreate server
 		if esperar_online; then
-			"${compose[@]}" logs --no-color --tail 400 server | grep -E "Copied|Portales a los mapas|missing or corrupted" || true
-			echo "Listo. Los portales están junto al templo de Montag (/town 1)."
+			"${compose[@]}" logs --no-color --tail 400 server | grep -E "Copied|Portales a los mapas|Portal de entrada|canary map|missing or corrupted" || true
+			echo "Listo. Mapa principal: $(leer MAP_NAME). Los portales salen en el log de arriba."
+		else
+			echo "El servidor no ha vuelto a arrancar. Mira: ./nocthold.sh test logs"
+			exit 1
+		fi ;;
+	mundo)
+		[ "$instancia" = test ] || { echo "El mapa principal solo se cambia en pruebas: ./nocthold.sh test mundo <nombre>"; exit 1; }
+		if [ -z "${1:-}" ]; then
+			echo "Mapa principal de pruebas: $(leer MAP_NAME)"
+			echo "Para cambiarlo: ./nocthold.sh test mundo <nombre> (o canary para volver al de Canary)"
+			exit 0
+		fi
+		[[ "$1" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "El nombre es el del .otbm sin la extensión (por ejemplo nocthold_world)"; exit 1; }
+		if [ "$1" != canary ] && [ ! -f "$mapas_privados/$1.otbm" ]; then
+			echo "No está $1.otbm en $mapas_privados: sube antes el paquete con ./nocthold.sh test mapas <fichero>"
+			exit 1
+		fi
+		if grep -q '^MAP_NAME=' "$env_file"; then
+			sed -i "s/^MAP_NAME=.*/MAP_NAME=$1/" "$env_file"
+		else
+			echo "MAP_NAME=$1" >>"$env_file"
+		fi
+		echo "Mapa principal de pruebas: $1. Reiniciando..."
+		"${compose[@]}" up -d --force-recreate server
+		if esperar_online; then
+			"${compose[@]}" logs --no-color --tail 400 server | grep -E "Copied|Portales a los mapas|Portal de entrada|canary map|missing or corrupted" || true
+			echo "Listo."
 		else
 			echo "El servidor no ha vuelto a arrancar. Mira: ./nocthold.sh test logs"
 			exit 1

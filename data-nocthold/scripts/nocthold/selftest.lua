@@ -227,7 +227,9 @@ local function checkGeneratedMaps()
 				fromTown = item and item:getActionId() == aid
 			end
 		end
-		check(fromTown, "mapa " .. name .. ": no hay portal junto al templo")
+		check(fromTown, "mapa " .. name .. ": no hay portal de entrada")
+		local e = mapa.puntos.entrada
+		check(NOCTHOLD_MAPAS.mapaEn(Position(e[1], e[2], e[3])) == name, "mapa " .. name .. ": su entrada no se reconoce como dentro del mapa")
 		if check(bad == 0, "mapa " .. name .. ": " .. bad .. " casillas no coinciden con el plano (la primera, " .. tostring(first) .. ")") then
 			check(floors == mapa.suelos and walls == mapa.paredes, "mapa " .. name .. ": cuenta de casillas distinta")
 			logger.info("[NOCTHOLD-TEST] Mapa generado " .. name .. ": " .. floors .. " suelos y " .. walls .. " paredes, todo como en el plano")
@@ -274,9 +276,11 @@ local function buildArena()
 	end
 
 	-- Portal del templo, altar, portal de salida y barrera.
-	check(U.townPortal and hasAid(U.townPortal, U.ITEM_PORTAL, U.AID_TO_LOBBY), "no hay portal junto al templo")
+	-- Junto al templo o, en el mapa del mundo, en el hueco de La Forja.
+	local near = getWaypointPositionByName(U.WORLD_WAYPOINT) or start
+	check(U.townPortal and hasAid(U.townPortal, U.ITEM_PORTAL, U.AID_TO_LOBBY), "no hay portal de entrada a La Forja")
 	if U.townPortal then
-		check(math.abs(U.townPortal.x - start.x) <= 4 and math.abs(U.townPortal.y - start.y) <= 4 and U.townPortal.z == start.z, "el portal está lejos del templo")
+		check(math.abs(U.townPortal.x - near.x) <= 4 and math.abs(U.townPortal.y - near.y) <= 4 and U.townPortal.z == near.z, "el portal está lejos de su sitio")
 		check(not Tile(U.townPortal):hasProperty(CONST_PROP_BLOCKSOLID), "el portal del templo no se puede pisar")
 	end
 	check(hasAid(U.layoutPos("altar"), U.ITEM_ALTAR, U.AID_ALTAR), "no hay altar en la entrada")

@@ -289,8 +289,11 @@ fi
 if [ "$CANARY_DATA_PACK" = "data-nocthold" ] && [ -d /canary/privado ]; then
 	shopt -s nullglob
 	for origen in /canary/privado/*.otbm /canary/privado/*.xml /canary/privado/*.lua; do
-		case "$origen" in
+		# El mapa principal propio (MAP_NAME=<nombre> en el .env de la instancia) y sus
+		# <nombre>-monster/-npc/-house/-zones.xml van a world/; el resto de mapas, a world/custom.
+		case "$(basename "$origen")" in
 			*.lua) destino="$CANARY_DATA_PACK/scripts/lib/$(basename "$origen")" ;;
+			"$CANARY_MAP_NAME.otbm" | "$CANARY_MAP_NAME"-*.xml) destino="$CANARY_DATA_PACK/world/$(basename "$origen")" ;;
 			*) destino="$CANARY_DATA_PACK/world/custom/$(basename "$origen")" ;;
 		esac
 		if [ -e "$destino" ]; then
@@ -304,6 +307,13 @@ if [ "$CANARY_DATA_PACK" = "data-nocthold" ] && [ -d /canary/privado ]; then
 	shopt -u nullglob
 else
 	echo "No private maps"
+fi
+# Si falta el mapa principal, Canary bajaría el de MAP_URL (otservbr) con ese nombre y cargaría
+# un mundo que no es el nuestro. Con el datapack propio se vuelve al mapa de Canary y se avisa.
+if [ "$CANARY_DATA_PACK" = "data-nocthold" ] && [ ! -f "$CANARY_DATA_PACK/world/$CANARY_MAP_NAME.otbm" ]; then
+	echo "WARNING: $CANARY_MAP_NAME.otbm is not in $CANARY_DATA_PACK/world (missing in the private folder?): using the canary map"
+	CANARY_MAP_NAME="canary"
+	set_lua_string "mapName" "$CANARY_MAP_NAME"
 fi
 
 echo ""

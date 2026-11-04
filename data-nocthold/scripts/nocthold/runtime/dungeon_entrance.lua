@@ -1,10 +1,11 @@
 -- Nocthold: entrada a La Forja Caída sin comandos.
 --
---   Portal junto al templo   -> lleva a la sala de entrada (la de los 5 NPC).
+--   Portal de entrada        -> lleva a la sala de entrada (la de los 5 NPC). Va en el hueco
+--                               DUNGEON_FALLEN_FORGE del mapa del mundo o, si no lo hay, junto al templo.
 --   Cronista de Llaves       -> da la piedra-llave del nivel que pidas (npc/nocthold_npcs.lua).
 --   Altar de la entrada      -> el líder lo usa con la piedra-llave encima: entra el grupo y empieza.
 --   Barrera del pasillo      -> solo pasan los de la expedición (para volver tras morir).
---   Portal de la entrada     -> vuelve al templo.
+--   Portal de la entrada     -> vuelve al portal de entrada del mundo (o al templo).
 --   Portal de la última sala -> aparece al terminar y te saca de la expedición.
 --
 -- Todo se crea al arrancar el servidor, encima de la sala de encounter_runtime.lua. Los objetos
@@ -23,6 +24,7 @@ U.AID_ALTAR = 45104
 U.AID_FINISH = 45105
 U.AID_KEY = 45106
 U.KEY_ATTRIBUTE = "nocthold_llave"
+U.WORLD_WAYPOINT = "DUNGEON_FALLEN_FORGE" -- hueco de La Forja en el mapa del mundo (si el mapa lo tiene)
 
 local function tell(player, message)
 	player:sendTextMessage(MESSAGE_EVENT_ADVANCE, Nocthold.latin1("[Nocthold] " .. message))
@@ -131,6 +133,11 @@ local function placeItem(itemId, position, actionId)
 	return item
 end
 
+local function isFree(p)
+	local tile = Tile(p)
+	return tile and tile:getGround() and tile:getItemCount() == 0 and not tile:hasProperty(CONST_PROP_BLOCKSOLID) and not tile:getTopCreature()
+end
+
 -- Primera casilla libre cerca del templo (sin paredes, objetos ni el propio templo).
 local function freeTileNear(center)
 	for distance = 2, 4 do
@@ -138,8 +145,7 @@ local function freeTileNear(center)
 			for dx = -distance, distance do
 				if math.max(math.abs(dx), math.abs(dy)) == distance then
 					local p = Position(center.x + dx, center.y + dy, center.z)
-					local tile = Tile(p)
-					if tile and tile:getGround() and tile:getItemCount() == 0 and not tile:hasProperty(CONST_PROP_BLOCKSOLID) and not tile:getTopCreature() then
+					if isFree(p) then
 						return p
 					end
 				end
@@ -194,16 +200,27 @@ function U.setupWorld()
 		local ground = Tile(U.pos(b[1], y)):getGround()
 		ground:setActionId(U.AID_BARRIER)
 	end
-	local portalPos = freeTileNear(temple)
+	-- En el mapa del mundo, el portal va en su hueco (el punto DUNGEON_FALLEN_FORGE) y al salir se
+	-- vuelve allí. En un mapa sin ese punto (el de Canary, el de la prueba automática), junto al templo.
+	local site = getWaypointPositionByName(U.WORLD_WAYPOINT)
+	local portalPos, where
+	if site then
+		portalPos = isFree(site) and site or freeTileNear(site)
+		where = U.WORLD_WAYPOINT
+	else
+		portalPos = freeTileNear(temple)
+		where = "templo"
+	end
 	if not portalPos then
-		return false, "no hay ninguna casilla libre cerca del templo para el portal."
+		return false, "no hay ninguna casilla libre para el portal (" .. where .. ")."
 	end
 	if not placeItem(U.ITEM_PORTAL, portalPos, U.AID_TO_LOBBY) then
-		return false, "no se pudo poner el portal del templo."
+		return false, "no se pudo poner el portal de entrada (" .. where .. ")."
 	end
 	U.townPortal = portalPos
+	U.worldExit = site and freeTileNear(portalPos) or nil
 	U.worldReady = true
-	return true, message .. " Portal del templo en " .. portalPos.x .. "," .. portalPos.y .. "," .. portalPos.z .. "."
+	return true, message .. " Portal de entrada (" .. where .. ") en " .. portalPos.x .. "," .. portalPos.y .. "," .. portalPos.z .. "."
 end
 
 local startup = GlobalEvent("NoctholdDungeonSetup")
@@ -239,6 +256,10 @@ function U.stepToLobby(player)
 end
 
 function U.stepToTown(player)
+	if U.worldExit then
+		teleport(player, U.worldExit)
+		return true
+	end
 	local town = player:getTown()
 	teleport(player, town and town:getTemplePosition() or U.townPortal)
 	return true

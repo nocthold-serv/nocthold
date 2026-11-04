@@ -1,7 +1,11 @@
 -- Nocthold: portales de los mapas generados con tools/mapas, sin ningún comando.
 --
---   Junto al templo  -> un portal por cada mapa generado (en orden alfabético) que lleva a su entrada.
---   Dentro del mapa  -> los portales del plano con "destino X: templo" llevan al templo del jugador.
+--   Entrada          -> un portal por cada mapa generado (en orden alfabético) que lleva a su entrada.
+--                       Va en el punto con nombre del mapa principal que diga el plano ("entrada_mundo:
+--                       DUNGEON_TIDAL_VAULT", los huecos de mazmorra del mapa del mundo) o, si no lo
+--                       tiene o ese punto no existe en el mapa cargado, junto al templo de la ciudad 1.
+--   Dentro del mapa  -> los portales del plano con "destino X: templo" sacan de la mazmorra: al lado
+--                       de su portal de entrada si está en el mundo, o al templo del jugador.
 --                       Los de "destino X: <punto>" o "X Y Z" ya llevan el destino en el .otbm:
 --                       los mueve Canary solo, sin pasar por aquí.
 --
@@ -15,6 +19,7 @@ M.ITEM_PORTAL = 1949 -- magic forcefield
 M.AID_TEMPLO = 45200 -- el mismo que pone tools/mapas/generar_mapa.py (AID_TEMPLO)
 M.AID_PRIMERO = 45201
 M.portales = {} -- action id -> { nombre, desde, destino }
+M.salidas = {} -- mapa -> dónde se sale (al lado de su portal en el mundo), si no es el templo
 
 function M.nombres()
 	local nombres = {}
@@ -25,18 +30,47 @@ function M.nombres()
 	return nombres
 end
 
+local function libre(p)
+	local tile = Tile(p)
+	return tile and tile:getGround() and tile:getItemCount() == 0 and not tile:hasProperty(CONST_PROP_BLOCKSOLID)
+		and not tile:getTopCreature()
+end
+
 function M.casillaLibreCerca(centro)
 	for distancia = 2, 6 do
 		for dy = -distancia, distancia do
 			for dx = -distancia, distancia do
 				if math.max(math.abs(dx), math.abs(dy)) == distancia then
 					local p = Position(centro.x + dx, centro.y + dy, centro.z)
-					local tile = Tile(p)
-					if tile and tile:getGround() and tile:getItemCount() == 0 and not tile:hasProperty(CONST_PROP_BLOCKSOLID)
-						and not tile:getTopCreature() then
+					if libre(p) then
 						return p
 					end
 				end
+			end
+		end
+	end
+	return nil
+end
+
+-- Dónde va el portal de entrada de un mapa: en su punto del mundo (o al lado) o junto al templo.
+function M.sitioDelPortal(mapa, templo)
+	local punto = mapa.entrada_mundo and getWaypointPositionByName(mapa.entrada_mundo)
+	if punto then
+		return libre(punto) and punto or M.casillaLibreCerca(punto), mapa.entrada_mundo
+	end
+	if mapa.entrada_mundo then
+		logger.warn("[NOCTHOLD] El mapa principal no tiene el punto " .. mapa.entrada_mundo .. ": portal junto al templo.")
+	end
+	return M.casillaLibreCerca(templo), "templo"
+end
+
+-- El mapa generado en el que está una posición (su caja ocupa y sus pisos), o nil.
+function M.mapaEn(p)
+	for nombre, mapa in pairs(Nocthold.mapas or {}) do
+		local o = mapa.ocupa or mapa.caja
+		for _, z in ipairs(mapa.pisos or { mapa.z }) do
+			if p.z == z and p.x >= o[1] and p.x <= o[3] and p.y >= o[2] and p.y <= o[4] then
+				return nombre
 			end
 		end
 	end
@@ -50,24 +84,30 @@ function M.preparar()
 	end
 	local templo = town:getTemplePosition()
 	local hechos = {}
+	M.salidas = {}
 	for i, nombre in ipairs(M.nombres()) do
 		local aid = M.AID_PRIMERO + i - 1
-		local e = Nocthold.mapas[nombre].puntos.entrada
+		local mapa = Nocthold.mapas[nombre]
+		local e = mapa.puntos.entrada
 		local destino = Position(e[1], e[2], e[3])
 		if not Tile(destino) then
 			logger.warn("[NOCTHOLD] El mapa " .. nombre .. " no está cargado (falta su .otbm en world/custom): sin portal.")
 		else
-			local desde = M.casillaLibreCerca(templo)
+			local desde, donde = M.sitioDelPortal(mapa, templo)
 			local item = desde and Game.createItem(M.ITEM_PORTAL, 1, desde)
 			if not item then
-				return false, "no hay sitio junto al templo para el portal de " .. nombre
+				return false, "no hay sitio para el portal de " .. nombre .. " (" .. donde .. ")"
 			end
 			item:setActionId(aid)
 			M.portales[aid] = { nombre = nombre, desde = desde, destino = destino }
-			hechos[#hechos + 1] = nombre .. " (" .. desde.x .. "," .. desde.y .. "," .. desde.z .. ")"
+			if donde ~= "templo" then
+				-- Al salir de la mazmorra se aparece al lado de su portal, no encima (volvería a entrar).
+				M.salidas[nombre] = M.casillaLibreCerca(desde)
+			end
+			hechos[#hechos + 1] = nombre .. " en " .. donde .. " (" .. desde.x .. "," .. desde.y .. "," .. desde.z .. ")"
 		end
 	end
-	return true, "Portales a los mapas generados junto al templo: " .. (#hechos > 0 and table.concat(hechos, ", ") or "ninguno")
+	return true, "Portales a los mapas generados: " .. (#hechos > 0 and table.concat(hechos, ", ") or "ninguno")
 end
 
 local inicio = GlobalEvent("NoctholdMapasPortales")
@@ -90,8 +130,14 @@ function M.pisar(creature, item, position, fromPosition)
 	local aid = item:getActionId()
 	local destino, texto
 	if aid == M.AID_TEMPLO then
-		destino = player:getTown():getTemplePosition()
-		texto = "Vuelves al templo."
+		local mapa = M.mapaEn(position)
+		destino = mapa and M.salidas and M.salidas[mapa]
+		if destino then
+			texto = "Sales de " .. mapa:gsub("_", " ") .. "."
+		else
+			destino = player:getTown():getTemplePosition()
+			texto = "Vuelves al templo."
+		end
 	else
 		local portal = M.portales[aid]
 		if not portal then

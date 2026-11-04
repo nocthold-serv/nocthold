@@ -193,6 +193,13 @@ que las puertas se abren sin llave.
 - Rampas: `piedra`, `tierra`, `gruta`, `musgo`, `barro`, `agrietada`, `manos`. El test comprueba en
   `data/items/items.xml` que cada una sube hacia la dirección que dice.
 
+## Entrada en el mapa del mundo
+
+Con `entrada_mundo: DUNGEON_TIDAL_VAULT` el portal que lleva a la mazmorra se pone en ese
+punto con nombre (waypoint) del mapa principal, o en la primera casilla libre de al lado, en vez
+de junto al templo. Los portales del plano con `destino X: templo` sacan entonces al lado de ese
+portal. Si el mapa cargado no tiene ese punto (el de Canary, por ejemplo), todo sigue junto al templo.
+
 ## Diseños que no van al repositorio
 
 El repositorio es público. Para un diseño propio, guarda los planos en otra carpeta y genera allí:
