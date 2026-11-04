@@ -373,7 +373,9 @@ case "$orden" in
 		[ "$instancia" = test ] || { echo "Los mapas privados solo van en pruebas: ./nocthold.sh test mapas <fichero>"; exit 1; }
 		if [ -z "${1:-}" ]; then
 			echo "Mapas privados en $mapas_privados:"
-			ls "$mapas_privados"/*.otbm 2>/dev/null | xargs -r -n1 basename || true
+			for f in "$mapas_privados"/*.otbm; do
+				if [ -e "$f" ]; then basename "$f"; fi
+			done
 			echo "Para cambiarlos: ./nocthold.sh test mapas <fichero.tar.gz>"
 			exit 0
 		fi
@@ -388,7 +390,8 @@ case "$orden" in
 		grep -q '\.otbm$' <<<"$nombres" || { echo "El paquete no trae ningún .otbm"; exit 1; }
 		rm -f "$mapas_privados"/*.otbm "$mapas_privados"/*.xml "$mapas_privados"/*.lua
 		tar -xzf "$paquete" -C "$mapas_privados"
-		echo "Mapas privados: $(cd "$mapas_privados" && ls *.otbm | tr '\n' ' ')"
+		echo "Mapas privados cargados en $mapas_privados:"
+		for f in "$mapas_privados"/*.otbm; do basename "$f"; done
 		echo "Reiniciando pruebas para cargarlos..."
 		"${compose[@]}" up -d --force-recreate server
 		if esperar_online; then
