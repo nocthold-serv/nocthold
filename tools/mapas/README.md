@@ -22,7 +22,8 @@ puntos para los jefes) y después se decora a mano en el RME.
 4. Sube los cambios en un PR. GitHub arranca el servidor de verdad con el mapa y comprueba
    casilla a casilla que está como en el plano.
 5. Cuando se fusiona en `develop`, el servidor de pruebas lo carga en el siguiente arranque.
-   Con un GOD: `/nocthold mapa` lista los mapas y `/nocthold mapa sala_prueba` te lleva a su entrada.
+   Junto al templo aparece un portal (campo mágico) por cada mapa generado, en orden alfabético:
+   al pisarlo te lleva a su entrada. Sin comandos.
 
 ## Qué significa cada letra
 
@@ -34,12 +35,27 @@ puntos para los jefes) y después se decora a mano en el RME.
 | `P` | suelo en zona protegida (no se puede atacar) |
 | `E` | entrada (obligatoria, solo una) |
 | `J` | jefe (si hay varias: `jefe`, `jefe2`...) |
-| `1` a `9` y otras mayúsculas | suelo con un punto con nombre (`1`, `2`... `n`) para los scripts |
+| `1` a `9` y otras mayúsculas | suelo con un punto con nombre (`1`, `2`... `k`) para los scripts |
+| `a` a `z` (minúsculas) | un monstruo del grupo (pull) de esa letra: todas las `c` son el grupo `c` |
 | espacio o `~` | nada |
 
 Con `paredes_auto: si` (lo normal) no hace falta dibujar paredes: toda casilla vacía que toca
 un suelo (también en diagonal) se convierte en pared. Las paredes se orientan solas
 (horizontal, vertical, esquina o poste) con las mismas reglas que el pincel del RME.
+
+Opciones de grupos y puntos (encima de `plano:`):
+
+```
+grupo c: Sabueso de Ceniza   # qué monstruo va en las casillas 'c'
+radio c: 4                   # radio de aggro del grupo, en casillas (1-15; si no, el de por defecto)
+punto K: jefe1               # nombre del punto marcado con 'K' (si no, se llama 'k')
+destino S: templo            # la 'S' es un portal que lleva al templo del jugador
+destino T: jefe1             # la 'T' es un portal a otro punto de este mapa
+destino U: 32369 32241 7     # ...o a una casilla concreta X Y Z
+```
+
+Los grupos se guardan en `nocthold_mapas.lua` (`grupos[letra] = {monstruo, radio, posiciones}`)
+para que el script de aggro cree los monstruos y su zona invisible. El `.otbm` no lleva monstruos.
 
 Los puntos quedan en el mapa como *waypoints* con el nombre `<mapa>.<punto>`, por ejemplo
 `sala_prueba.jefe`. Desde Lua: `getWaypointPositionByName("sala_prueba.jefe")`.
@@ -52,6 +68,14 @@ comprueba con `data/items/appearances.dat` que los suelos son suelo y las parede
 - Suelos: `piedra gris`, `piedra`, `marmol negro`, `adoquin marron`, `tierra de cueva` (mezcla piezas).
 - Paredes: `piedra` (con puertas), `roca`, `piedra clara`.
 
+## Diseños que no van al repositorio
+
+El repositorio es público. Para un diseño propio, guarda los planos en otra carpeta y genera allí:
+
+```
+python3 tools/mapas/generar_mapa.py --planos MI_CARPETA_DE_PLANOS --salida MI_CARPETA_DE_MAPAS
+```
+
 ## Qué genera
 
 En `data-nocthold/world/custom/`: `<nombre>.otbm` y sus cuatro ficheros de monstruos, NPC,
@@ -59,7 +83,7 @@ casas y zonas (vacíos de momento). Canary carga todos los `.otbm` de esa carpet
 arrancar con `DATA_PACK=data-nocthold`. Producción no usa esta carpeta.
 
 En `data-nocthold/scripts/lib/nocthold_mapas.lua`: la lista de mapas con sus puntos y lo que
-debe haber en cada casilla (lo usan `/nocthold mapa` y la prueba automática).
+debe haber en cada casilla (lo usan los portales de `mapas_portales.lua` y la prueba automática).
 
 No edites a mano lo generado: cambia el plano y vuelve a ejecutar el programa. GitHub falla
 si lo generado no coincide con los planos.

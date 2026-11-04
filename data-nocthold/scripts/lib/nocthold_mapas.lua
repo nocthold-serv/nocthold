@@ -1,15 +1,27 @@
 -- GENERADO por tools/mapas/generar_mapa.py: no lo edites a mano (cambia el plano y vuelve a generar).
 -- Mapas de data-nocthold/world/custom/ hechos con el generador: puntos con nombre y, para la prueba
 -- automática (selftest.lua), lo que tiene que haber en cada casilla: {x, y, suelo, objeto o 0, zona protegida}.
+-- grupos: cada letra minúscula del plano es un grupo de monstruos (un pull); posiciones = dónde va cada uno.
+
+-- Se suma a Nocthold.mapas (puede haber otro fichero igual con mapas que no están en el repositorio).
 
 Nocthold = Nocthold or {}
-Nocthold.mapas = {
+Nocthold.mapas = Nocthold.mapas or {}
+for nombre, mapa in pairs({
 	["sala_prueba"] = {
 		z = 7, caja = {63999, 64099, 64017, 64116}, suelos = 100, paredes = 92,
 		puntos = {
 			["entrada"] = {64003, 64101, 7},
+			["s"] = {64006, 64101, 7},
 			["1"] = {64003, 64107, 7},
 			["jefe"] = {64011, 64114, 7},
+			["t"] = {64016, 64114, 7},
+		},
+		portales = {
+			{64006, 64101, 7, destino = "templo"},
+			{64016, 64114, 7, destino = {64003, 64101, 7}},
+		},
+		grupos = {
 		},
 		casillas = {
 			{63999, 64099, 429, 1296, false},
@@ -37,7 +49,7 @@ Nocthold.mapas = {
 			{64003, 64101, 429, 0, false},
 			{64004, 64101, 429, 0, true},
 			{64005, 64101, 429, 0, true},
-			{64006, 64101, 429, 0, true},
+			{64006, 64101, 429, 0, false},
 			{64007, 64101, 429, 1294, false},
 			{63999, 64102, 429, 1294, false},
 			{64000, 64102, 429, 0, true},
@@ -206,4 +218,6 @@ Nocthold.mapas = {
 			{64017, 64116, 429, 1298, false},
 		},
 	},
-}
+}) do
+	Nocthold.mapas[nombre] = mapa
+end

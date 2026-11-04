@@ -8,9 +8,13 @@ suelo: piedra gris
 pared: piedra
 paredes_auto: si
 
+# S: portal de vuelta al templo. T: portal del jefe a la entrada.
+destino S: templo
+destino T: entrada
+
 plano:
 PPPPPPP
-PPPEPPP
+PPPEPPS
 PPPPPPP
 ###+###
    .
@@ -23,5 +27,5 @@ PPPPPPP
             .
       ...........
       ...........
-      .....J.....
+      .....J....T
       ...........

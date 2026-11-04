@@ -92,15 +92,41 @@ class Plano(unittest.TestCase):
         m, _ = generar(plano("#.\n+E\n#.\n", paredes_auto="no"))
         self.assertEqual(m.tiles[(1000, 1001, 7)].items, [pared["puerta_vertical"]])
 
+    def test_grupos_de_pull(self):
+        _, info = generar(plano("E.aa.b\n.a....\n", **{"grupo a": "Sabueso de Ceniza", "radio b": "5"}))
+        self.assertEqual(info["grupos"], {
+            "a": {"monstruo": "Sabueso de Ceniza", "radio": None, "posiciones": [(1002, 1000, 7), (1003, 1000, 7), (1001, 1001, 7)]},
+            "b": {"monstruo": None, "radio": 5, "posiciones": [(1005, 1000, 7)]},
+        })
+        self.assertEqual(info["suelos"], 12)  # los monstruos van sobre suelo normal
+
+    def test_portales(self):
+        m, info = generar(plano("ES.T\n..K.\n", **{"destino S": "templo", "destino T": "jefe1", "punto K": "jefe1"}))
+        salida = m.tiles[(1001, 1000, 7)].items
+        self.assertEqual(salida, [otbm.Item(gm.PORTAL, aid=gm.AID_TEMPLO)])
+        self.assertEqual(m.tiles[(1003, 1000, 7)].items, [otbm.Item(gm.PORTAL, (1002, 1001, 7))])
+        self.assertEqual(info["portales"], [(1001, 1000, 7, "templo"), (1003, 1000, 7, (1002, 1001, 7))])
+        self.assertEqual(info["paredes"], 16)  # los portales no cuentan como pared
+        leido = otbm.read(otbm.write(m))
+        self.assertEqual(leido.tiles, m.tiles)
+        _, info = generar(plano("ET\n", **{"destino T": "100 200 7"}))
+        self.assertEqual(info["portales"], [(1001, 1000, 7, (100, 200, 7))])
+        with self.assertRaises(gm.ErrorPlano):
+            generar(plano("ET\n", **{"destino T": "a ninguna parte"}))
+
     def test_puntos_repetidos_y_letras(self):
         _, info = generar(plano("EJJ1N\n"))
         self.assertEqual([p for p, *_ in info["puntos"]], ["entrada", "jefe", "jefe2", "1", "n"])
+        _, info = generar(plano("EKJ\n", **{"punto K": "jefe_final"}))
+        self.assertEqual([p for p, *_ in info["puntos"]], ["entrada", "jefe_final", "jefe"])
 
     def test_errores_claros(self):
         casos = {
             plano("....\n"): "exactamente una E",
             plano("E..\nE..\n"): "exactamente una E",
-            plano("E.x\n"): "no conozco el carácter 'x'",
+            plano("E.*\n"): "no conozco el carácter '*'",
+            plano("E.a\n", **{"grupo b": "Sabueso"}): "ninguna 'b'",
+            plano("E.a\n", **{"radio a": "0"}): "entre 1 y 15",
             plano("E\t.\n"): "tabulador",
             plano("E.+.\n", paredes_auto="no"): "puerta",
             plano("E.\n", suelo="lava"): "suelo 'lava' desconocido",
