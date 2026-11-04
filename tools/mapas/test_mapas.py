@@ -142,9 +142,9 @@ class Plano(unittest.TestCase):
         self.assertEqual(info["paredes"], 16)
         self.assertIn(m.tiles[(1001, 998, 7)].ground, roca)      # detrás del borde, roca maciza
         self.assertNotIn(m.tiles[(1001, 996, 7)].ground, roca)   # más allá, el exterior de siempre
-        # Pared fina entre dos salas: no hay roca detrás, así que es tierra que no se pisa.
+        # Pared fina entre dos salas: no hay roca detrás, así que es roca maciza (no se pisa).
         m, info = generar(plano("..E\n...\n\n...\n...\n", pared="cueva basalto"))
-        self.assertEqual(m.tiles[(1001, 1002, 7)].ground, 101)
+        self.assertIn(m.tiles[(1001, 1002, 7)].ground, roca)
         self.assertTrue(info["extra"][(1001, 1002, 7)]["bloquea"])
         with self.assertRaises(gm.ErrorPlano):
             generar(plano("E.+..\n", pared="cueva basalto"))

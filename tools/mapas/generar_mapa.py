@@ -481,6 +481,16 @@ def generar(opciones, filas, materiales, origen_fichero="plano"):
         pared = materiales["paredes"][zona_en(z, c, f)["pared"]]
         return pared if "macizo" in pared else None
 
+    # Paredes de cueva sin roca detrás (una pared de 1 o 2 casillas entre dos salas): son roca maciza,
+    # y las de al lado ponen su borde mirando hacia ellas.
+    macizas = {}
+    for z in zs:
+        macizas[z] = set()
+        for (c, f), ch in celdas[z].items():
+            if ch in ("#", "+") and cueva_en(z, c, f) and all(
+                    (c + dc, f + dr) in celdas[z] for dc in (-1, 0, 1) for dr in (-1, 0, 1)):
+                macizas[z].add((c, f))
+
     def roca_junto(z, c, f):
         """Para el exterior: la roca maciza de la cueva de al lado (detrás del borde de roca), si la hay."""
         for dc in (-1, 0, 1):
@@ -600,13 +610,14 @@ def generar(opciones, filas, materiales, origen_fichero="plano"):
                 # Borde de roca (como las cuevas de Tibia): las piezas que miran a la roca maciza de detrás.
                 if ch == "+":
                     raise ErrorPlano(f"{donde}: una pared de cueva no tiene puertas")
-                piezas = _piezas_borde(lambda dc, dr: (c + dc, f + dr) not in celdas[z], cueva)
+                piezas = [] if (c, f) in macizas[z] else _piezas_borde(
+                    lambda dc, dr: (c + dc, f + dr) not in celdas[z] or (c + dc, f + dr) in macizas[z], cueva)
                 if piezas:
                     t.items.extend(piezas)
                     paredes.add((x, y, z))
                 else:
-                    # Pared fina entre dos suelos: tierra que no se puede pisar, sin borde.
-                    t.ground = _suelo_en(x, y, materiales["suelos"]["tierra"])
+                    # Pared sin roca detrás: roca maciza (no se puede pisar), sin borde.
+                    t.ground = _suelo_en(x, y, materiales["suelos"][cueva["macizo"]])
                     extra[(x, y, z)] = {"objetos": [], "bloquea": True}
                     listadas.add((x, y, z))
                     if (c, f) in capa_objetos[z]:
