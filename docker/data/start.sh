@@ -273,6 +273,40 @@ fi
 echo "config.lua updated"
 
 echo ""
+echo "===== Private Maps (Nocthold) ====="
+echo ""
+
+# Mapas que no van en el repositorio (público): el VPS monta su carpeta en /canary/privado
+# (solo la instancia de pruebas, ver infra/canary/docker-compose.privado.yml). Se copian
+# dentro del datapack en cada arranque; lo copiado la vez anterior se borra antes.
+copiados="/canary/.mapas-privados-copiados"
+if [ -f "$copiados" ]; then
+	while IFS= read -r copiado; do
+		rm -f -- "$copiado"
+	done <"$copiados"
+	rm -f "$copiados"
+fi
+if [ "$CANARY_DATA_PACK" = "data-nocthold" ] && [ -d /canary/privado ]; then
+	shopt -s nullglob
+	for origen in /canary/privado/*.otbm /canary/privado/*.xml /canary/privado/*.lua; do
+		case "$origen" in
+			*.lua) destino="$CANARY_DATA_PACK/scripts/lib/$(basename "$origen")" ;;
+			*) destino="$CANARY_DATA_PACK/world/custom/$(basename "$origen")" ;;
+		esac
+		if [ -e "$destino" ]; then
+			echo "Skipped $(basename "$origen"): already in the data pack"
+			continue
+		fi
+		cp -- "$origen" "$destino"
+		printf '%s\n' "$destino" >>"$copiados"
+		echo "Copied $(basename "$origen")"
+	done
+	shopt -u nullglob
+else
+	echo "No private maps"
+fi
+
+echo ""
 echo "================================"
 echo ""
 

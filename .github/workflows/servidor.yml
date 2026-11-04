@@ -225,7 +225,16 @@ jobs:
           # pequeño de data-canary. Es una BD de usar y tirar: nunca se hace con la real.
           # NOCTHOLD_SELFTEST=1 activa data-nocthold/scripts/nocthold/selftest.lua, que dentro
           # del servidor real construye la sala, crea NPC y monstruos y juega una llave 7 entera.
-          compose="docker compose -p ci -f infra/canary/docker-compose.yml --env-file ci.env"
+          # También se prueba la carpeta de mapas privados del VPS (docker-compose.privado.yml):
+          # un mapa que no está en el repositorio, hecho aquí con el generador desde una copia
+          # de sala_prueba en otro sitio. La prueba de dentro revisa también todas sus casillas.
+          privado="$RUNNER_TEMP/privado"
+          mkdir -p "$privado/planos" "$privado/mapas"
+          sed -e 's/^nombre: .*/nombre: prueba_privada/' -e 's/^origen: .*/origen: 64600 64100 7/' \
+            tools/mapas/planos/sala_prueba.txt > "$privado/planos/prueba_privada.txt"
+          python3 tools/mapas/generar_mapa.py --planos "$privado/planos" --salida "$privado/mapas"
+          export MAPAS_PRIVADOS="$privado/mapas"
+          compose="docker compose -p ci -f infra/canary/docker-compose.yml -f infra/canary/docker-compose.privado.yml --env-file ci.env"
           printf 'DATA_PACK=data-nocthold\nMAP_NAME=canary\nNOCTHOLD_SELFTEST=1\n' >> ci.env
           $compose up -d --force-recreate server
           for i in $(seq 1 60); do
@@ -240,6 +249,8 @@ jobs:
               fallo=0
               echo "$logs" | grep -q "\[NOCTHOLD\] OK" || { echo "::error::El datapack propio no dijo [NOCTHOLD] OK."; fallo=1; }
               echo "$logs" | grep -q "\[NOCTHOLD-TEST\] TODO OK" || { echo "::error::La prueba de la mazmorra dentro del servidor ha fallado."; fallo=1; }
+              echo "$logs" | grep -q "Copied prueba_privada.otbm" || { echo "::error::No se copió el mapa privado."; fallo=1; }
+              echo "$logs" | grep -q "Portales a los mapas generados.*prueba_privada" || { echo "::error::El mapa privado no tiene portal junto al templo."; fallo=1; }
               # Errores en nuestros archivos. Un TalkAction que Canary no registra no dice el
               # fichero, solo el comando ("TalkAction with name !nocthold ..."): también cuenta.
               propios='monster/nocthold/|npc/nocthold_npcs|scripts/nocthold/|scripts/lib/nocthold|TalkAction with name [!/]nocthold|NOCTHOLD'

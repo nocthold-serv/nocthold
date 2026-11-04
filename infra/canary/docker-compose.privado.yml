@@ -1,0 +1,9 @@
+# Solo para la instancia de pruebas: ./nocthold.sh test ... lo añade solo.
+#
+# Monta la carpeta privada del VPS con los mapas que no se suben al repositorio
+# (es público). Al arrancar, start.sh copia lo que haya dentro al datapack
+# data-nocthold. Para subir mapas: ./nocthold.sh test mapas <fichero.tar.gz>
+services:
+  server:
+    volumes:
+      - "${MAPAS_PRIVADOS:?falta MAPAS_PRIVADOS}:/canary/privado:ro"

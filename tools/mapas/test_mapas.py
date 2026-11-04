@@ -6,6 +6,7 @@ La prueba con el servidor de verdad la hace data-nocthold/scripts/nocthold/selft
 import collections
 import json
 import os
+import re
 import subprocess
 import sys
 import unittest
@@ -169,6 +170,21 @@ class Materiales(unittest.TestCase):
                     self.assertIn(item_id, self.objetos)
                     self.assertTrue(self.objetos[item_id]["bloquea"])
                     self.assertFalse(self.objetos[item_id]["suelo"])
+
+    def test_puertas_abribles_sin_llave(self):
+        # data/libs/tables/doors.lua dice qué puertas son "cerradas con llave" (lockedDoor):
+        # esas no las abre nadie sin llave, así que el generador no puede usarlas.
+        with open(os.path.join(RAIZ, "data", "libs", "tables", "doors.lua"), encoding="utf-8") as f:
+            texto = f.read()
+        con_llave = {int(x) for x in re.findall(r"lockedDoor\s*=\s*(\d+)", texto)}
+        cerradas = {int(x) for x in re.findall(r"closedDoor\s*=\s*(\d+)", texto)}
+        self.assertTrue(con_llave)
+        for nombre, piezas in self.materiales["paredes"].items():
+            for pieza, item_id in piezas.items():
+                if pieza.startswith("puerta"):
+                    with self.subTest(pared=nombre, pieza=pieza):
+                        self.assertNotIn(item_id, con_llave, "es una puerta cerrada con llave")
+                        self.assertIn(item_id, cerradas)
 
     def test_orientacion_como_en_el_mapa_de_canary(self):
         # En canary.otbm (hecho a mano con el RME) miramos qué pieza de pared de piedra
