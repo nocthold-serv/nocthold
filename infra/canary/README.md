@@ -136,6 +136,32 @@ Siempre desde `~/nocthold/infra/canary`:
 Cambia `prod` por `test` para la instancia de pruebas. Al parar, Canary tiene
 hasta 2 minutos para guardar a los jugadores.
 
+## Mapas privados (solo pruebas)
+
+Las mazmorras propias no se suben a GitHub, porque el repositorio es público.
+Viven en el VPS, en `~/nocthold-privado/mapas` (fuera del repositorio), y solo
+las ve la instancia de pruebas con el datapack `data-nocthold`
+(`docker-compose.privado.yml` monta esa carpeta y el arranque copia su contenido
+al datapack).
+
+Se suben como un paquete `.tar.gz` con los `.otbm`, `.xml` y el
+`nocthold_mapas_privados.lua` que hace `tools/mapas/generar_mapa.py --salida`:
+
+```powershell
+scp $HOME\Downloads\mapas_privados.tar.gz nocthold@158.220.91.85:~/
+```
+
+y en el VPS:
+
+```bash
+cd ~/nocthold/infra/canary
+./nocthold.sh test mapas ~/mapas_privados.tar.gz
+```
+
+Sustituye los mapas privados que hubiera, reinicia pruebas y dice qué ha cargado.
+`./nocthold.sh test mapas` sin fichero dice cuáles hay. Cada mapa tiene su portal
+junto al templo de Montag (`/town 1`).
+
 Además, cada vez que arranca, el servidor deja una copia de su base de datos
 dentro del volumen `server-data`.
 

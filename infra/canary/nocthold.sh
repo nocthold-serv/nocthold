@@ -18,6 +18,9 @@
 #   ./nocthold.sh prod soltar    deshace "volver": se vuelve a seguir la rama
 #   ./nocthold.sh prod auto [quitar|ver]   actualización automática (prod a las
 #                                6:01 tras el server save, test cada 5 minutos)
+#   ./nocthold.sh test mapas <fichero.tar.gz>
+#                                mete mapas privados (no van a GitHub) en pruebas
+#                                y reinicia; sin fichero dice cuáles hay
 #   ./nocthold.sh prod <otro>    cualquier orden de "docker compose"
 #
 # La primera vez crea prod.env / test.env con contraseñas aleatorias.
@@ -63,7 +66,14 @@ if [ ! -f "$env_file" ]; then
 fi
 
 leer() { grep -m1 "^$1=" "$env_file" | cut -d= -f2-; }
-compose=(docker compose -p "nocthold-$instancia" --env-file "$env_file")
+compose=(docker compose -p "nocthold-$instancia" --env-file "$env_file" -f docker-compose.yml)
+# Mapas privados (no están en GitHub): solo en pruebas, en una carpeta del VPS fuera del repositorio.
+mapas_privados="$HOME/nocthold-privado/mapas"
+if [ "$instancia" = test ]; then
+	mkdir -p "$mapas_privados"
+	export MAPAS_PRIVADOS="$mapas_privados"
+	compose+=(-f docker-compose.privado.yml)
+fi
 shift 2
 
 # "volver" deja aquí la imagen elegida. Mientras exista, manda sobre la del .env
@@ -359,6 +369,35 @@ case "$orden" in
 	down)
 		# Sin -v: nunca borra la base de datos. Para borrarla hay que hacerlo a mano.
 		"${compose[@]}" down "$@" ;;
+	mapas)
+		[ "$instancia" = test ] || { echo "Los mapas privados solo van en pruebas: ./nocthold.sh test mapas <fichero>"; exit 1; }
+		if [ -z "${1:-}" ]; then
+			echo "Mapas privados en $mapas_privados:"
+			ls "$mapas_privados"/*.otbm 2>/dev/null | xargs -r -n1 basename || true
+			echo "Para cambiarlos: ./nocthold.sh test mapas <fichero.tar.gz>"
+			exit 0
+		fi
+		paquete="$1"
+		[ -f "$paquete" ] || { echo "No encuentro $paquete"; exit 1; }
+		# Solo ficheros sueltos .otbm, .xml y .lua, sin carpetas: nada más entra.
+		nombres="$(tar -tzf "$paquete")" || { echo "$paquete no es un .tar.gz válido"; exit 1; }
+		while IFS= read -r f; do
+			[[ "$f" =~ ^[A-Za-z0-9_-]+(\.otbm|\.xml|\.lua)$ ]] ||
+				{ echo "Fichero no permitido dentro del paquete: $f"; exit 1; }
+		done <<<"$nombres"
+		grep -q '\.otbm$' <<<"$nombres" || { echo "El paquete no trae ningún .otbm"; exit 1; }
+		rm -f "$mapas_privados"/*.otbm "$mapas_privados"/*.xml "$mapas_privados"/*.lua
+		tar -xzf "$paquete" -C "$mapas_privados"
+		echo "Mapas privados: $(cd "$mapas_privados" && ls *.otbm | tr '\n' ' ')"
+		echo "Reiniciando pruebas para cargarlos..."
+		"${compose[@]}" up -d --force-recreate server
+		if esperar_online; then
+			"${compose[@]}" logs --no-color --tail 400 server | grep -E "Copied|Portales a los mapas|missing or corrupted" || true
+			echo "Listo. Los portales están junto al templo de Montag (/town 1)."
+		else
+			echo "El servidor no ha vuelto a arrancar. Mira: ./nocthold.sh test logs"
+			exit 1
+		fi ;;
 	*)
 		"${compose[@]}" "$orden" "$@" ;;
 esac
