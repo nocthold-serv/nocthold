@@ -147,7 +147,8 @@ local function checkGeneratedMaps()
 		end
 		local bad, floors, walls, first = 0, 0, 0, nil
 		for _, c in ipairs(mapa.casillas) do
-			local tile = Tile(Position(c[1], c[2], mapa.z))
+			local z = c.z or mapa.z
+			local tile = Tile(Position(c[1], c[2], z))
 			local ground = tile and tile:getGround()
 			-- c = {x, y, suelo, pared o 0, zona protegida[, {decoración}, bloquea el paso]}
 			local blocks = c[4] ~= 0
@@ -175,7 +176,7 @@ local function checkGeneratedMaps()
 			end
 			if problem then
 				bad = bad + 1
-				first = first or (c[1] .. "," .. c[2] .. "," .. mapa.z .. ": " .. problem)
+				first = first or (c[1] .. "," .. c[2] .. "," .. z .. ": " .. problem)
 			elseif c[4] ~= 0 then
 				walls = walls + 1
 			else
@@ -195,6 +196,25 @@ local function checkGeneratedMaps()
 					local d = portal.getDestination and portal:getDestination()
 					check(d and d.x == p.destino[1] and d.y == p.destino[2] and d.z == p.destino[3], where .. ": destino distinto del plano")
 				end
+			end
+		end
+		-- Subidas entre pisos: la rampa cambia de piso, encima está la bajada y arriba se puede salir.
+		for _, s in ipairs(mapa.subidas or {}) do
+			local r, a = s[1], s[2]
+			local where = "mapa " .. name .. ": subida " .. r[1] .. "," .. r[2] .. "," .. r[3]
+			local ramp = Tile(Position(r[1], r[2], r[3]))
+			local down = Tile(Position(r[1], r[2], r[3] - 1))
+			local out = Tile(Position(a[1], a[2], a[3]))
+			check(ramp and ramp:hasFlag(TILESTATE_FLOORCHANGE), where .. ": la rampa no sube")
+			check(down and down:hasFlag(TILESTATE_FLOORCHANGE_DOWN), where .. ": encima no hay bajada")
+			check(out and out:getGround() and not out:hasProperty(CONST_PROP_BLOCKSOLID), where .. ": arriba no se puede salir")
+		end
+		-- Exterior: el relleno de alrededor llega hasta las esquinas (si no, se vería el fondo vacío).
+		for _, z in ipairs(mapa.relleno or {}) do
+			local o = mapa.ocupa
+			for _, p in ipairs({ { o[1], o[2] }, { o[3], o[2] }, { o[1], o[4] }, { o[3], o[4] } }) do
+				local t = Tile(Position(p[1], p[2], z))
+				check(t and t:getGround(), "mapa " .. name .. ": falta el exterior en " .. p[1] .. "," .. p[2] .. "," .. z)
 			end
 		end
 		-- Portal del templo hacia la entrada del mapa (mapas_portales.lua).

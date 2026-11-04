@@ -1,5 +1,5 @@
 {
-  "_nota": "Suelos, paredes y bordes que entiende generar_mapa.py. Los números son IDs de objeto de Canary 15.x (los mismos que ve el RME). Para los suelos con varias piezas, el número de al lado es el peso (cuántas veces sale más que las demás). Las paredes siguen las piezas del pincel del RME: horizontal, vertical, esquina y poste; una pieza con varios IDs es una lista de variantes (sale una u otra según la casilla, siempre la misma). test_mapas.py comprueba con data/items/appearances.dat que todo existe y es lo que dice ser.",
+  "_nota": "Suelos, paredes y bordes que entiende generar_mapa.py. Los números son IDs de objeto de Canary 15.x (los mismos que ve el RME). Para los suelos con varias piezas, el número de al lado es el peso (cuántas veces sale más que las demás). Las paredes siguen las piezas del pincel del RME: horizontal, vertical, esquina y poste; una pieza con varios IDs es una lista de variantes (sale una u otra según la casilla, siempre la misma). test_mapas.py comprueba con data/items/appearances.dat que todo existe y es lo que dice ser. Las rampas (subidas entre pisos) son, para cada dirección en la que se camina para subir, [rampa, pie de la rampa], como el pincel del RME; test_mapas.py comprueba que la rampa cambia de piso hacia esa dirección (data/items/items.xml).",
   "suelos": {
     "piedra gris": [[429, 1]],
     "piedra": [[436, 1]],
@@ -18,7 +18,11 @@
     "agua de sangre": [[32688, 2500], [32689, 1500], [32690, 1500], [32691, 1000], [32692, 2500], [32693, 2500]],
     "marea negra": [[837, 850], [838, 50], [839, 50], [840, 50]],
     "agua profunda": [[4597, 3], [4598, 1], [4599, 1], [4600, 1], [4601, 1], [4602, 1]],
-    "agua negra": [[12558, 1], [12559, 1], [12560, 1], [12561, 1], [12562, 1], [12563, 1]]
+    "agua negra": [[12558, 1], [12559, 1], [12560, 1], [12561, 1], [12562, 1], [12563, 1]],
+    "tierra": [[101, 600], [5711, 10], [5712, 1], [5713, 4], [5714, 5], [5715, 10], [5716, 1], [5717, 8], [5718, 1], [5719, 10], [5720, 3], [5721, 7], [5722, 9], [5723, 5], [5724, 2], [5725, 1], [5726, 10]],
+    "fondo marino": [[9291, 800], [5405, 200], [5406, 2500], [5407, 2500], [5408, 2500], [5409, 2500]],
+    "basalto": [[15000, 1], [15001, 1], [15002, 1], [15003, 1]],
+    "tierra maldita": [[10534, 2500], [10535, 1000]]
   },
   "paredes": {
     "piedra": {"horizontal": 1295, "vertical": 1294, "esquina": 1298, "poste": 1296, "puerta_horizontal": 6252, "puerta_vertical": 6249},
@@ -33,6 +37,18 @@
     "agua profunda": {"orden": 7600, "n": 4633, "e": 4634, "s": 4635, "o": 4636, "eno": 4641, "ene": 4642, "eso": 4643, "ese": 4644, "dno": 4637, "dne": 4638, "dso": 4639, "dse": 4640},
     "agua negra": {"orden": 7500, "n": 12583, "e": 12584, "s": 12585, "o": 12586, "eno": 12591, "ene": 12592, "eso": 12593, "ese": 12594, "dno": 12587, "dne": 12588, "dso": 12589, "dse": 12590},
     "fango negro": {"orden": 6700, "n": 10566, "e": 10567, "s": 10568, "o": 10569, "eno": 10570, "ene": 10571, "eso": 10572, "ese": 10573, "dno": 10574, "dne": 10575, "dso": 10576, "dse": 10577},
-    "moho": {"orden": 5800, "n": 15029, "e": 15030, "s": 15028, "o": 15031, "eno": 15038, "ene": 15039, "eso": 15037, "ese": 15036, "dno": 15034, "dne": 15035, "dso": 15033, "dse": 15032}
+    "moho": {"orden": 5800, "n": 15029, "e": 15030, "s": 15028, "o": 15031, "eno": 15038, "ene": 15039, "eso": 15037, "ese": 15036, "dno": 15034, "dne": 15035, "dso": 15033, "dse": 15032},
+    "tierra": {"orden": 10500, "n": 5631, "e": 5636, "s": 5637, "o": 5630, "eno": 5634, "ene": 5635, "eso": 5633, "ese": 5632, "dno": 5646, "dne": 5650, "dso": 5649, "dse": 5648},
+    "fondo marino": {"orden": 2300, "n": 5426, "e": 5428, "s": 5427, "o": 5429, "eno": 5436, "ene": 5437, "eso": 5435, "ese": 5434, "dno": 5433, "dne": 5432, "dso": 5431, "dse": 5430},
+    "tierra maldita": {"orden": 6500, "n": 10522, "e": 10523, "s": 10524, "o": 10525, "eno": 10526, "ene": 10527, "eso": 10528, "ese": 10529, "dno": 10530, "dne": 10531, "dso": 10532, "dse": 10533}
+  },
+  "rampas": {
+    "piedra": {"norte": [1956, 1957], "sur": [1954, 1955], "este": [1950, 1951], "oeste": [1952, 1953]},
+    "tierra": {"norte": [7548, 7549], "sur": [7546, 7547], "este": [7542, 7543], "oeste": [7544, 7545]},
+    "gruta": {"norte": [13722, 13723], "sur": [13720, 13721], "este": [13716, 13717], "oeste": [13718, 13719]},
+    "musgo": {"norte": [15114, 15115], "sur": [15112, 15113], "este": [15108, 15109], "oeste": [15110, 15111]},
+    "barro": {"norte": [16686, 16687], "sur": [16684, 16685], "este": [16680, 16681], "oeste": [16682, 16683]},
+    "agrietada": {"norte": [33175, 33174], "sur": [33181, 33180], "este": [33179, 33178], "oeste": [33177, 33176]},
+    "manos": {"norte": [33233, 33232], "sur": [33239, 33238], "este": [33237, 33236], "oeste": [33235, 33234]}
   }
 }
