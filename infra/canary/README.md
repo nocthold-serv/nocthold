@@ -144,8 +144,8 @@ las ve la instancia de pruebas con el datapack `data-nocthold`
 (`docker-compose.privado.yml` monta esa carpeta y el arranque copia su contenido
 al datapack).
 
-Se suben como un paquete `.tar.gz` con los `.otbm`, `.xml` y el
-`nocthold_mapas_privados.lua` que hace `tools/mapas/generar_mapa.py --salida`:
+Se suben como un paquete `.tar.gz` con los `.otbm`, `.xml` y los
+`nocthold_mapa_<nombre>.lua` (uno por mapa) que hace `tools/mapas/generar_mapa.py --salida`:
 
 ```powershell
 scp $HOME\Downloads\mapas_privados.tar.gz nocthold@158.220.91.85:~/
@@ -158,8 +158,11 @@ cd ~/nocthold/infra/canary
 ./nocthold.sh test mapas ~/mapas_privados.tar.gz
 ```
 
-Sustituye los mapas privados que hubiera, reinicia pruebas y dice qué ha cargado.
-`./nocthold.sh test mapas` sin fichero dice cuáles hay. Cada mapa tiene su portal
+Se suma a lo que ya hay: un mapa con el mismo nombre se cambia por el nuevo y los
+demás se quedan. Reinicia pruebas y dice qué ha cargado. `./nocthold.sh test mapas`
+sin fichero dice cuáles hay y `./nocthold.sh test mapas quitar <nombre>` quita uno.
+Si dos mapas se pisan, el log lo dice ("se pisan"). Un paquete antiguo (con un solo
+`nocthold_mapas_privados.lua` para todos) sigue sustituyéndolo todo. Cada mapa tiene su portal
 en su hueco del mapa del mundo (`entrada_mundo:` en el plano) o, si no, junto al
 templo de la ciudad 1.
 

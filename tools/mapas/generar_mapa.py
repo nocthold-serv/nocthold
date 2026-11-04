@@ -5,6 +5,7 @@ Uso (desde la carpeta del repositorio):
     python3 tools/mapas/generar_mapa.py              # genera todos los planos de tools/mapas/planos/
     python3 tools/mapas/generar_mapa.py --comprobar  # solo mira que lo generado está al día (GitHub)
     python3 tools/mapas/generar_mapa.py --planos MIS_PLANOS --salida MI_CARPETA  # diseños privados
+                                                     # (con un nocthold_mapa_<nombre>.lua por mapa)
 
 Por cada plano escribe en data-nocthold/world/custom/ el mapa <nombre>.otbm y sus
 cuatro ficheros acompañantes (monstruos, NPC, casas y zonas, vacíos). Canary carga
@@ -910,7 +911,11 @@ def generar_todo(carpeta=PLANOS, salida_mapas=SALIDA_MAPAS, salida_lua=SALIDA_LU
     salida = {}
     for m, info in mapas:
         salida.update(ficheros_de(m, info, salida_mapas))
-    salida[salida_lua] = lua_de(mapas)
+        if salida_lua is None:
+            # Diseños privados: un .lua por mapa, para poder subir paquetes que se suman a los que ya hay.
+            salida[os.path.join(salida_mapas, f"nocthold_mapa_{info['nombre']}.lua")] = lua_de([(m, info)])
+    if salida_lua is not None:
+        salida[salida_lua] = lua_de(mapas)
     return mapas, salida
 
 
@@ -925,7 +930,7 @@ def main(argv=None):
     salida_mapas, salida_lua = SALIDA_MAPAS, SALIDA_LUA
     if args.salida:
         salida_mapas = os.path.abspath(args.salida)
-        salida_lua = os.path.join(salida_mapas, "nocthold_mapas_privados.lua")
+        salida_lua = None  # nocthold_mapa_<nombre>.lua, uno por mapa
     try:
         mapas, salida = generar_todo(os.path.abspath(args.planos) if args.planos else PLANOS, salida_mapas, salida_lua)
     except ErrorPlano as e:
@@ -952,7 +957,7 @@ def main(argv=None):
         print(f"{info['nombre']}: {info['suelos']} casillas de suelo y {info['paredes']} de pared, "
               f"de {x1},{y1} a {x2},{y2} (pisos {', '.join(str(p) for p in info['pisos'])}; {info['exterior']} de exterior). Puntos: {', '.join(p for p, *_ in info['puntos'])}. "
               f"Grupos: {len(info['grupos'])} ({sum(len(g['monstruos']) for g in info['grupos'].values())} monstruos).")
-    print(f"Escritos en {salida_mapas}/ y {salida_lua}.")
+    print(f"Escritos en {salida_mapas}/" + (f" y {salida_lua}." if salida_lua else " (con un .lua por mapa)."))
     return 0
 
 

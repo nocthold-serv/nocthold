@@ -77,7 +77,34 @@ function M.mapaEn(p)
 	return nil
 end
 
+-- Los mapas privados se suben por separado (un paquete cada uno): si dos se pisan, aquí se ve.
+function M.solapes()
+	local nombres = M.nombres()
+	local malos = {}
+	for i = 1, #nombres do
+		for j = i + 1, #nombres do
+			local a, b = Nocthold.mapas[nombres[i]], Nocthold.mapas[nombres[j]]
+			local oa, ob = a.ocupa or a.caja, b.ocupa or b.caja
+			local pisos = {}
+			for _, z in ipairs(a.pisos or { a.z }) do
+				pisos[z] = true
+			end
+			local mismoPiso = false
+			for _, z in ipairs(b.pisos or { b.z }) do
+				mismoPiso = mismoPiso or pisos[z] == true
+			end
+			if mismoPiso and oa[1] <= ob[3] and ob[1] <= oa[3] and oa[2] <= ob[4] and ob[2] <= oa[4] then
+				malos[#malos + 1] = nombres[i] .. " y " .. nombres[j]
+			end
+		end
+	end
+	return malos
+end
+
 function M.preparar()
+	for _, par in ipairs(M.solapes()) do
+		logger.error("[NOCTHOLD] Los mapas " .. par .. " se pisan: cambia el 'origen' de uno en su plano.")
+	end
 	local town = Game.getTowns()[1]
 	if not town then
 		return false, "el mapa no tiene ciudades"

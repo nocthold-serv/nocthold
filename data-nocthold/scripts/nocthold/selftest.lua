@@ -236,6 +236,7 @@ local function checkGeneratedMaps()
 		end
 	end
 	check(count > 0, "no hay mapas generados (falta data-nocthold/scripts/lib/nocthold_mapas.lua)")
+	check(#NOCTHOLD_MAPAS.solapes() == 0, "hay mapas generados que se pisan")
 end
 
 local function hasAid(position, itemId, aid)

@@ -19,8 +19,10 @@
 #   ./nocthold.sh prod auto [quitar|ver]   actualización automática (prod a las
 #                                6:01 tras el server save, test cada 5 minutos)
 #   ./nocthold.sh test mapas <fichero.tar.gz>
-#                                mete mapas privados (no van a GitHub) en pruebas
-#                                y reinicia; sin fichero dice cuáles hay
+#                                añade mapas privados (no van a GitHub) a pruebas
+#                                y reinicia; los del mismo nombre se cambian, el
+#                                resto se queda; sin fichero dice cuáles hay
+#   ./nocthold.sh test mapas quitar <nombre>   quita un mapa privado
 #   ./nocthold.sh test mundo <nombre|canary>
 #                                mapa principal de pruebas: uno privado (<nombre>.otbm del
 #                                paquete de mapas) o el de Canary; sin nombre dice cuál hay
@@ -374,12 +376,43 @@ case "$orden" in
 		"${compose[@]}" down "$@" ;;
 	mapas)
 		[ "$instancia" = test ] || { echo "Los mapas privados solo van en pruebas: ./nocthold.sh test mapas <fichero>"; exit 1; }
-		if [ -z "${1:-}" ]; then
+		listar_mapas() {
 			echo "Mapas privados en $mapas_privados:"
 			for f in "$mapas_privados"/*.otbm; do
-				if [ -e "$f" ]; then basename "$f"; fi
+				if [ -e "$f" ]; then echo "  $(basename "$f" .otbm)"; fi
 			done
-			echo "Para cambiarlos: ./nocthold.sh test mapas <fichero.tar.gz>"
+		}
+		reiniciar_mapas() {
+			echo "Reiniciando pruebas para cargarlos..."
+			"${compose[@]}" up -d --force-recreate server
+			if esperar_online; then
+				"${compose[@]}" logs --no-color --tail 400 server | grep -E "Copied|Portales a los mapas|Portal de entrada|canary map|missing or corrupted|se pisa" || true
+				echo "Listo. Mapa principal: $(leer MAP_NAME). Los portales salen en el log de arriba."
+			else
+				echo "El servidor no ha vuelto a arrancar. Mira: ./nocthold.sh test logs"
+				exit 1
+			fi
+		}
+		if [ -z "${1:-}" ]; then
+			listar_mapas
+			echo "Para añadir o cambiar mapas: ./nocthold.sh test mapas <fichero.tar.gz>"
+			echo "Para quitar uno:            ./nocthold.sh test mapas quitar <nombre>"
+			exit 0
+		fi
+		if [ "$1" = quitar ]; then
+			quitar="${2:-}"
+			[[ "$quitar" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "Uso: ./nocthold.sh test mapas quitar <nombre> (sin .otbm)"; exit 1; }
+			[ -f "$mapas_privados/$quitar.otbm" ] || { echo "No hay ningún mapa $quitar"; listar_mapas; exit 1; }
+			[ "$quitar" != "$(leer MAP_NAME)" ] ||
+				{ echo "$quitar es el mapa principal: cámbialo antes con ./nocthold.sh test mundo canary"; exit 1; }
+			rm -f "$mapas_privados/$quitar.otbm" "$mapas_privados/$quitar"-*.xml "$mapas_privados/nocthold_mapa_$quitar.lua"
+			if [ -f "$mapas_privados/nocthold_mapas_privados.lua" ]; then
+				echo "Ojo: hay un nocthold_mapas_privados.lua de un paquete antiguo con varios mapas juntos."
+				echo "Sube un paquete nuevo de cada mapa para que se quite del todo."
+			fi
+			echo "Quitado $quitar."
+			listar_mapas
+			reiniciar_mapas
 			exit 0
 		fi
 		paquete="$1"
@@ -391,19 +424,19 @@ case "$orden" in
 				{ echo "Fichero no permitido dentro del paquete: $f"; exit 1; }
 		done <<<"$nombres"
 		grep -q '\.otbm$' <<<"$nombres" || { echo "El paquete no trae ningún .otbm"; exit 1; }
-		rm -f "$mapas_privados"/*.otbm "$mapas_privados"/*.xml "$mapas_privados"/*.lua
-		tar -xzf "$paquete" -C "$mapas_privados"
-		echo "Mapas privados cargados en $mapas_privados:"
-		for f in "$mapas_privados"/*.otbm; do basename "$f"; done
-		echo "Reiniciando pruebas para cargarlos..."
-		"${compose[@]}" up -d --force-recreate server
-		if esperar_online; then
-			"${compose[@]}" logs --no-color --tail 400 server | grep -E "Copied|Portales a los mapas|Portal de entrada|canary map|missing or corrupted" || true
-			echo "Listo. Mapa principal: $(leer MAP_NAME). Los portales salen en el log de arriba."
+		if grep -qx 'nocthold_mapas_privados.lua' <<<"$nombres"; then
+			# Formato antiguo: un solo .lua con todos los mapas del paquete. Sustituye lo que hubiera.
+			echo "Paquete antiguo (todos los mapas en un .lua): sustituye a los mapas que hubiera."
+			rm -f "$mapas_privados"/*.otbm "$mapas_privados"/*.xml "$mapas_privados"/*.lua
 		else
-			echo "El servidor no ha vuelto a arrancar. Mira: ./nocthold.sh test logs"
-			exit 1
-		fi ;;
+			# Se suma a lo que hay: los mapas con el mismo nombre se cambian por los nuevos y el resto se queda.
+			rm -f "$mapas_privados/nocthold_mapas_privados.lua"
+		fi
+		tar -xzf "$paquete" -C "$mapas_privados"
+		echo "Añadido o cambiado:"
+		grep '\.otbm$' <<<"$nombres" | sed 's/\.otbm$//; s/^/  /'
+		listar_mapas
+		reiniciar_mapas ;;
 	mundo)
 		[ "$instancia" = test ] || { echo "El mapa principal solo se cambia en pruebas: ./nocthold.sh test mundo <nombre>"; exit 1; }
 		if [ -z "${1:-}" ]; then
