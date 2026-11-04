@@ -9,7 +9,8 @@ Por qué OTClient y no el cliente oficial de Tibia: el oficial no se puede redis
 | Pieza | Dónde |
 |---|---|
 | Versión de OTClient que usamos (commit fijo) | [`otclient.ref`](otclient.ref) |
-| Lo que cambiamos al cliente (servidor, nombre) | [`configurar.py`](configurar.py) |
+| Lo que cambiamos al cliente (servidor, nombre, hechizos) | [`configurar.py`](configurar.py) |
+| Hechizos: iconos y descripciones propios | [`hechizos/`](hechizos/LEEME.md) |
 | Release de la que se reutiliza el `.exe` (vacío = compilar) | [`exe.ref`](exe.ref) |
 | Instrucciones que van dentro del `.zip` | [`LEEME.txt`](LEEME.txt) |
 | Compilación y empaquetado | [`.github/workflows/cliente-windows.yml`](../.github/workflows/cliente-windows.yml) |

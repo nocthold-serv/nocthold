@@ -2,7 +2,8 @@
 -- Canary 3.6.1 Revscriptsys; values are first-pass balance and require in-game tuning.
 local spell = Spell("instant")
 spell:name("Arcane Surge")
-spell:words("nocthold surge")
+spell:words("aeth celer")
+spell:id(1030)
 spell:group("support")
 spell:cooldown(30000)
 spell:groupCooldown(1000)

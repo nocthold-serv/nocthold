@@ -2,7 +2,8 @@
 -- Canary 3.6.1 Revscriptsys; values are first-pass balance and require in-game tuning.
 local spell = Spell("instant")
 spell:name("Guardian's Oath")
-spell:words("nocthold oath")
+spell:words("stal oth")
+spell:id(1010)
 spell:group("support")
 spell:cooldown(90000)
 spell:groupCooldown(1000)
