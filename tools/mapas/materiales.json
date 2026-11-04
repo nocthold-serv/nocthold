@@ -8,7 +8,7 @@
     "tierra de cueva": [[351, 6], [352, 1], [353, 1], [354, 1], [355, 1], [7756, 2500], [10480, 1000]]
   },
   "paredes": {
-    "piedra": {"horizontal": 1295, "vertical": 1294, "esquina": 1298, "poste": 1296, "puerta_horizontal": 6251, "puerta_vertical": 6248},
+    "piedra": {"horizontal": 1295, "vertical": 1294, "esquina": 1298, "poste": 1296, "puerta_horizontal": 6252, "puerta_vertical": 6249},
     "roca": {"horizontal": 1113, "vertical": 1112, "esquina": 1116, "poste": 1114},
     "piedra clara": {"horizontal": 1547, "vertical": 1549, "esquina": 1550, "poste": 1551}
   }
