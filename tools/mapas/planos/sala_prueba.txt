@@ -12,6 +12,14 @@ paredes_auto: si
 destino S: templo
 destino T: entrada
 
+# Zonas y objetos (capas debajo del plano): la sala del jefe con barro negro, paredes de hueso
+# y un charco de brea; una antorcha de calavera, una columna de calaveras y unos huesos.
+zona f: suelo fango negro, pared huesos
+zona n: suelo marea negra
+objeto L: pared 11054 11055
+objeto p: 10837 10838 10839 10841
+objeto h: 3114 3115 3116
+
 plano:
 PPPPPPP
 PPPEPPS
@@ -29,3 +37,34 @@ PPPPPPP
       ...........
       .....J....T
       ...........
+capa zonas:
+
+
+
+
+
+
+
+
+
+
+
+
+      fffffffffff
+      fffffffffff
+      fffffffffff
+      fnnffffffff
+capa objetos:
+
+
+
+
+
+ L
+
+ p
+     h
+
+
+
+              p
