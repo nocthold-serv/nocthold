@@ -160,7 +160,8 @@ que las puertas se abren sin llave.
 
 - Suelos: `piedra gris`, `piedra`, `marmol negro`, `adoquin marron`, `tierra de cueva`, `templo mojado`,
   `templo mojado oscuro`, `marmol abisal`, `marmol abisal roto`, `agua somera`, `musgo`, `fango negro`,
-  `moho`, `losas oscuras`, `agua de sangre`, `tierra` (la de fuera de las cuevas, con su borde); y sin pisar:
+  `moho`, `losas oscuras`, `agua de sangre`, `tierra` (la de fuera de las cuevas), `fondo marino`, `tierra maldita`,
+  `basalto` (estos cuatro, pensados para el exterior); y sin pisar:
   `marea negra` (brea), `agua profunda`, `agua negra`.
 - Paredes: `piedra` (con puertas), `roca`, `piedra clara`, `piedra maciza`, `piedra oscura`, `huesos`, `manos`.
   Una pieza de pared con varios IDs es una lista de variantes.
