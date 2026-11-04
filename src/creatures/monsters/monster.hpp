@@ -247,6 +247,14 @@ public:
 	bool isTarget(const std::shared_ptr<Creature> &creature);
 	bool isFleeing() const;
 
+	// Nocthold: zonas de aggro. Un monstruo "dormido" ve a los jugadores pero no los elige
+	// como objetivo ni da pasos al azar hasta que un script lo despierta (al entrar en la
+	// zona invisible de su grupo o al recibir daño).
+	bool isDormant() const {
+		return dormant;
+	}
+	void setDormant(bool value);
+
 	void setFatalHoldDuration(int32_t value);
 
 	bool getDistanceStep(const Position &targetPos, Direction &direction, bool flee = false);
@@ -453,6 +461,7 @@ private:
 	bool canFlee = false;
 	bool isWalkingBack = false;
 	bool isIdle = true;
+	bool dormant = false;
 	bool extraMeleeAttack = false;
 	bool randomStepping = false;
 	bool ignoreFieldDamage = false;

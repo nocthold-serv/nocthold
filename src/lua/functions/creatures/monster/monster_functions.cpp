@@ -29,6 +29,8 @@ void MonsterFunctions::init(lua_State* L) {
 	Lua::registerMethod(L, "Monster", "isInSpawnRange", MonsterFunctions::luaMonsterIsInSpawnRange);
 	Lua::registerMethod(L, "Monster", "isIdle", MonsterFunctions::luaMonsterIsIdle);
 	Lua::registerMethod(L, "Monster", "setIdle", MonsterFunctions::luaMonsterSetIdle);
+	Lua::registerMethod(L, "Monster", "isDormant", MonsterFunctions::luaMonsterIsDormant);
+	Lua::registerMethod(L, "Monster", "setDormant", MonsterFunctions::luaMonsterSetDormant);
 	Lua::registerMethod(L, "Monster", "isTarget", MonsterFunctions::luaMonsterIsTarget);
 	Lua::registerMethod(L, "Monster", "isOpponent", MonsterFunctions::luaMonsterIsOpponent);
 	Lua::registerMethod(L, "Monster", "isFriend", MonsterFunctions::luaMonsterIsFriend);
@@ -226,6 +228,30 @@ int MonsterFunctions::luaMonsterSetIdle(lua_State* L) {
 	}
 
 	monster->setIdle(Lua::getBoolean(L, 2));
+	Lua::pushBoolean(L, true);
+	return 1;
+}
+
+int MonsterFunctions::luaMonsterIsDormant(lua_State* L) {
+	// monster:isDormant()
+	const auto &monster = Lua::getUserdataShared<Monster>(L, 1, "Monster");
+	if (monster) {
+		Lua::pushBoolean(L, monster->isDormant());
+	} else {
+		lua_pushnil(L);
+	}
+	return 1;
+}
+
+int MonsterFunctions::luaMonsterSetDormant(lua_State* L) {
+	// monster:setDormant(dormant)
+	const auto &monster = Lua::getUserdataShared<Monster>(L, 1, "Monster");
+	if (!monster) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	monster->setDormant(Lua::getBoolean(L, 2));
 	Lua::pushBoolean(L, true);
 	return 1;
 }

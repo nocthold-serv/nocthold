@@ -1432,6 +1432,10 @@ bool Monster::isTarget(const std::shared_ptr<Creature> &creature) {
 }
 
 bool Monster::isTarget(const std::shared_ptr<Creature> &creature, bool monsterPerfTestFriendlyFire) {
+	if (dormant && !isSummon()) {
+		return false;
+	}
+
 	if (creature->isRemoved() || !creature->isAttackable() || creature->getZoneType() == ZONE_PROTECTION || !canSeeCreature(creature)) {
 		return false;
 	}
@@ -1451,6 +1455,21 @@ bool Monster::isTarget(const std::shared_ptr<Creature> &creature, bool monsterPe
 	}
 
 	return true;
+}
+
+void Monster::setDormant(bool value) {
+	if (dormant == value) {
+		return;
+	}
+
+	dormant = value;
+	if (dormant) {
+		setAttackedCreature(nullptr);
+		setFollowCreature(nullptr);
+	} else if (!isRemoved() && getHealth() > 0) {
+		updateIdleStatus();
+		g_game().addCreatureCheck(getMonster());
+	}
 }
 
 void Monster::setFatalHoldDuration(int32_t value) {
@@ -2492,6 +2511,9 @@ bool Monster::getNextStep(Direction &nextDirection, uint32_t &flags) {
 }
 
 void Monster::doRandomStep(Direction &nextDirection, bool &result) {
+	if (dormant) {
+		return;
+	}
 	if (getTimeSinceLastMove() >= 1000) {
 		randomStepping = true;
 		result = getRandomStep(getPosition(), nextDirection);

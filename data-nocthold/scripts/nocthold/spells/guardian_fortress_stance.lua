@@ -4,7 +4,8 @@
 
 local spell = Spell("instant")
 spell:name("Fortress Stance")
-spell:words("nocthold fortress")
+spell:words("stal mur")
+spell:id(1006)
 spell:group("support")
 spell:cooldown(18000)
 spell:groupCooldown(1000)

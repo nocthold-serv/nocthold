@@ -6,9 +6,10 @@
 --   constantes usadas por los scripts, los 7 monstruos, los 30 hechizos (nombre y palabras),
 --   que no queda ningún comando (!nocthold ni /nocthold), los mapas generados (tools/mapas)
 --   casilla a casilla, la sala de La Forja Caída casilla a casilla, los 5 NPC, el portal del
---   templo, el altar, la barrera y el portal de salida, una piedra-llave de verdad,
---   y una expedición entera de llave 7 empezada desde el altar (6 fases, afijos, refuerzos de
---   jefe, muertes, la piedra sube a 8, portal final, salida y limpieza) con un jugador simulado.
+--   templo, el altar, la barrera y el portal de salida, una piedra-llave de verdad, las zonas de
+--   aggro (grupos dormidos que se despiertan enteros al entrar alguien en su zona o al recibir
+--   daño), y una expedición entera de llave 7 empezada desde el altar (6 fases, afijos, refuerzos
+--   de jefe, muertes, la piedra sube a 8, portal final, salida y limpieza) con un jugador simulado.
 -- Lo que NO puede probar sin un cliente conectado: lanzar los hechizos, hablar con los NPC
 -- y las fases de los jefes por vida (Canary no "piensa" por monstruos sin jugadores cerca).
 -- Eso lo cubren los tests de tests/lua y la prueba en el juego.
@@ -50,7 +51,7 @@ end
 -- todas las constantes que usan los archivos de data-nocthold.
 local constants = {
 	"AREA_CIRCLE2X2", "CALLBACK_GREET", "CALLBACK_MESSAGE_DEFAULT", "COMBAT_EARTHDAMAGE", "COMBAT_ENERGYDAMAGE",
-	"COMBAT_FIREDAMAGE", "COMBAT_FORMULA_LEVELMAGIC", "COMBAT_HEALING", "COMBAT_ICEDAMAGE",
+	"COMBAT_FIREDAMAGE", "COMBAT_FORMULA_LEVELMAGIC", "COMBAT_HEALING", "COMBAT_HOLYDAMAGE", "COMBAT_ICEDAMAGE",
 	"COMBAT_PARAM_AGGRESSIVE", "COMBAT_PARAM_BLOCKARMOR", "COMBAT_PARAM_BLOCKSHIELD", "COMBAT_PARAM_DISPEL",
 	"COMBAT_PARAM_EFFECT", "COMBAT_PARAM_TYPE", "COMBAT_PHYSICALDAMAGE", "CONDITION_ATTRIBUTES",
 	"CONDITION_HASTE", "CONDITION_PARALYZE", "CONDITION_PARAM_HEALTHGAIN", "CONDITION_PARAM_HEALTHTICKS",
@@ -99,15 +100,20 @@ local function staticChecks()
 	check(#Nocthold.npcs == Nocthold.expectedNpcs, "NPC registrados " .. #Nocthold.npcs .. "/" .. Nocthold.expectedNpcs)
 	check(#Nocthold.spells == Nocthold.expectedSpells, "hechizos registrados " .. #Nocthold.spells .. "/" .. Nocthold.expectedSpells)
 
-	-- Hechizos: Canary los tiene de verdad, con palabras "nocthold ..." únicas que llevan al mismo hechizo.
-	local seenWords = {}
+	-- Hechizos: Canary los tiene de verdad, con palabras únicas que llevan al mismo hechizo y un id
+	-- propio (1001-1030) único: el enfriamiento va por id y el cliente busca el icono por ese id.
+	local seenWords, seenIds = {}, {}
 	for _, name in ipairs(Nocthold.spells) do
 		local spell = Spell(name)
 		if check(spell ~= nil, "Canary no conoce el hechizo " .. name) then
 			local words = spell:words()
-			check(type(words) == "string" and words:sub(1, 9) == "nocthold ", "palabras del hechizo " .. name .. ": " .. tostring(words))
+			check(type(words) == "string" and words ~= "" and not words:find("nocthold", 1, true), "palabras del hechizo " .. name .. ": " .. tostring(words))
 			check(not seenWords[words or ""], "palabras repetidas: " .. tostring(words))
 			seenWords[words or ""] = true
+			local id = spell:id()
+			check(type(id) == "number" and id >= 1001 and id <= 1030, "id del hechizo " .. name .. ": " .. tostring(id))
+			check(not seenIds[id or 0], "id repetido: " .. tostring(id))
+			seenIds[id or 0] = true
 			local byWords = words and Spell(words)
 			check(byWords ~= nil and byWords:name() == name, "las palabras '" .. tostring(words) .. "' no llevan a " .. name)
 		end
@@ -349,6 +355,90 @@ runChecks = function()
 	finish()
 end
 
+-- Zonas de aggro (scripts/lib/nocthold_aggro.lua) con el motor de verdad: dos grupos dormidos
+-- en la tercera sala de la arena (vacía hasta la fase 3 de la expedición). Un monstruo marcado
+-- como "provocador" hace de jugador: se queda fuera, luego entra en la zona del grupo A, y al
+-- grupo B se le hace daño desde fuera. Cada grupo debe despertarse entero y solo cuando toca.
+local function checkAggro(siguiente)
+	local A = Nocthold.aggro
+	local function crear(nombre, dxs, dy)
+		local lista = {}
+		for _, dx in ipairs(dxs) do
+			local m = Game.createMonster(Nocthold.latin1(nombre), arenaPos(dx, dy), false, true)
+			if check(m ~= nil, "aggro: no se pudo crear " .. nombre .. " en " .. dx .. "," .. dy) then
+				m:setDormant(true)
+				lista[#lista + 1] = m
+			end
+		end
+		return lista
+	end
+	local grupoA = crear("Sabueso de Ceniza", { 46, 47, 48 }, 10)
+	local grupoB = crear("Carroñero de Escoria", { 46, 48 }, 20)
+	check(A.crearGrupo("ci.a", grupoA, 2) ~= nil, "aggro: no se pudo crear el grupo A")
+	check(A.crearGrupo("ci.b", grupoB, 2) ~= nil, "aggro: no se pudo crear el grupo B")
+	local gA, gB = A.grupos["ci.a"], A.grupos["ci.b"]
+	if not check(gA and gB, "aggro: faltan los grupos") then
+		return siguiente()
+	end
+	-- Caja de los 3 Sabuesos (x 46-48, y 10) más 2 casillas: 7 x 5 = 35 casillas.
+	check(#gA.zona:getPositions() == 35, "aggro: la zona del grupo A tiene " .. #gA.zona:getPositions() .. " casillas, deberían ser 35")
+
+	local provocador = Game.createMonster(Nocthold.latin1("Carroñero de Escoria"), arenaPos(48, 15), false, true)
+	if not check(provocador ~= nil, "aggro: no se pudo crear el provocador") then
+		return siguiente()
+	end
+	A.provocadores[provocador:getId()] = true
+	for _, m in ipairs(grupoA) do
+		check(m:isDormant() == true, "aggro: un Sabueso del grupo A no está dormido")
+		check(m:isTarget(provocador) == false, "aggro: un monstruo dormido puede elegir objetivo")
+	end
+	for _, m in ipairs(grupoB) do
+		check(m:isDormant() == true, "aggro: un monstruo del grupo B no está dormido")
+	end
+	check(provocador:isTarget(grupoA[1]) == true, "aggro: control fallido, un monstruo despierto debería poder elegir objetivo")
+
+	local function limpiar()
+		A.provocadores[provocador:getId()] = nil
+		provocador:remove()
+		check(A.quitarGrupo("ci.a") and A.quitarGrupo("ci.b"), "aggro: no se pudieron quitar los grupos")
+		check(next(A.porZona) == nil and next(A.grupos) == nil, "aggro: quedan grupos o zonas apuntados")
+		local quedan = 0
+		for _, c in ipairs(Game.getSpectators(arenaPos(48, 15), false, false, 8, 8, 8, 8)) do
+			if c:isMonster() then
+				quedan = quedan + 1
+			end
+		end
+		check(quedan == 0, "aggro: " .. quedan .. " monstruos se quedaron en la tercera sala")
+	end
+
+	addEvent(guarded("aggro fuera", function()
+		check(not gA.despierto and not gB.despierto, "aggro: un grupo se despertó sin que nadie entrara en su zona")
+		provocador:teleportTo(arenaPos(47, 12)) -- borde de la zona A
+		addEvent(guarded("aggro dentro", function()
+			check(gA.despierto, "aggro: entrar en la zona no despertó al grupo A")
+			local despiertos = 0
+			for _, m in ipairs(grupoA) do
+				if not m:isDormant() and m:isTarget(provocador) then
+					despiertos = despiertos + 1
+				end
+			end
+			check(despiertos == #grupoA, "aggro: solo " .. despiertos .. "/" .. #grupoA .. " del grupo A se despertaron")
+			check(not gB.despierto, "aggro: entrar en la zona A despertó también al grupo B")
+
+			doTargetCombatHealth(0, grupoB[1], COMBAT_HOLYDAMAGE, -50, -50, CONST_ME_HOLYDAMAGE)
+			addEvent(guarded("aggro daño", function()
+				check(gB.despierto, "aggro: hacer daño a uno del grupo B no despertó al grupo")
+				for _, m in ipairs(grupoB) do
+					check(not m:isDormant(), "aggro: un monstruo del grupo B sigue dormido tras el daño")
+				end
+				limpiar()
+				logger.info("[NOCTHOLD-TEST] Zonas de aggro: grupo A despierto al entrar, grupo B al recibir daño, cada uno por separado")
+				siguiente()
+			end), 500)
+		end), 1000)
+	end), 1500)
+end
+
 local function runDungeon()
 	-- Desde el altar con la piedra de nivel 7 (activa los dos afijos alfa).
 	local stranger = newFake(arenaPos(9, 15), -4343)
@@ -369,7 +459,7 @@ function selftest.onStartup()
 		staticChecks()
 		checkGeneratedMaps()
 		buildArena()
-		runDungeon()
+		checkAggro(guarded("expedición", runDungeon))
 	end), 3000)
 	return true
 end

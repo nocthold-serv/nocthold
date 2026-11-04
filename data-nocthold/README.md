@@ -13,7 +13,7 @@ se actualice, no hay que fusionar una copia entera de `data-canary`.
 |---|---|---|
 | `monster/nocthold/` | 7 monstruos (4 normales y 3 jefes con fases: al 70 % y al 35 % de vida llaman refuerzos) | Dan oro; sin experiencia todavía. Aspecto provisional. |
 | `npc/nocthold_npcs.lua` | 5 NPC con diálogo | Se colocan solos al arrancar. El Cronista de Llaves da la piedra-llave y la Archivista dice el estado. |
-| `scripts/nocthold/spells/` | 30 hechizos: Guardian (knight), Warden (druid) y Arcanist (sorcerer) | Se lanzan con `nocthold <palabra>`. Balance sin ajustar. |
+| `scripts/nocthold/spells/` | 30 hechizos: Guardian (knight), Warden (druid) y Arcanist (sorcerer) | Se lanzan desde la barra de acciones del cliente (ver `client/hechizos/LEEME.md`). Balance sin ajustar. |
 | `scripts/nocthold/runtime/` | La Forja Caída: 6 encuentros, llaves 0-10, cronómetro y recompensa en oro. `dungeon_entrance.lua`: portal, altar, piedra-llave, barrera y salidas | Una sola arena compartida (un grupo a la vez); la expedición en curso se pierde al reiniciar (la piedra-llave no). |
 | `scripts/lib/nocthold.lua` | Lista de lo que debe cargarse y `Nocthold.latin1()` | Lo usa el aviso de arranque. |
 | `scripts/nocthold/nocthold_startup.lua` | Al arrancar escribe `[NOCTHOLD] OK ...` en el log | La comprobación de GitHub busca esa línea. |
@@ -88,6 +88,23 @@ monstruos y juega una llave 7 entera empezada desde el altar (6 fases, afijos, r
 portal final, salida y limpieza). Tiene que terminar en `[NOCTHOLD-TEST] TODO OK`. Lanzar hechizos, hablar con
 NPC y las fases de los jefes por vida necesitan un jugador conectado: eso lo prueban
 `tests/lua/test_nocthold_*.lua` con funciones simuladas y, al final, la prueba en el juego.
+
+## Zonas de aggro (pulls)
+
+Los monstruos de un grupo pueden estar **dormidos**: ven a los jugadores pero no atacan ni se
+mueven hasta que alguien entra en la zona invisible del grupo (una caja alrededor de sus
+monstruos más `radio` casillas, 3 por defecto) o le hace daño a uno de ellos. Entonces se
+despierta **el grupo entero** a la vez. Los GM/GOD no despiertan grupos.
+
+- Motor: `monster:setDormant(true|false)` y `monster:isDormant()` (cambio nuestro en
+  `src/creatures/monsters/monster.cpp`).
+- Lógica: `scripts/lib/nocthold_aggro.lua` (`Nocthold.aggro.crearGrupo`, `prepararMapa`,
+  `despertar`, `quitarGrupo`); eventos en `scripts/nocthold/aggro.lua`.
+- Mapas del generador: `Nocthold.aggro.prepararMapa("<mapa>")` crea dormidos los grupos del
+  plano (`Nocthold.mapas[m].grupos[letra] = { monstruo, radio, posiciones }`).
+- Sin comandos: al arrancar el servidor, cada mapa generado que traiga grupos en su plano
+  los coloca solo (`scripts/nocthold/aggro.lua`). La mazmorra podrá rehacerlos al empezar
+  una expedición con `prepararMapa`.
 
 ## Pendiente (siguiente trabajo)
 
