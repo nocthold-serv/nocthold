@@ -129,6 +129,17 @@ class Plano(unittest.TestCase):
                     generar(mal)
                 self.assertIn(mensaje, str(e.exception))
 
+    def test_entrada_en_el_mundo(self):
+        texto = plano("E..\n", entrada_mundo="DUNGEON_TIDAL_VAULT")
+        m, info = generar(texto)
+        self.assertEqual(info["entrada_mundo"], "DUNGEON_TIDAL_VAULT")
+        lua = gm.lua_de([(m, {**info, "exterior": 0, "relleno": []})]).decode()
+        self.assertIn('entrada_mundo = "DUNGEON_TIDAL_VAULT",', lua)
+        self.assertNotIn("entrada_mundo =", gm.lua_de([generar(plano("E..\n"))]).decode())
+        with self.assertRaises(gm.ErrorPlano) as e:
+            generar(texto.replace("DUNGEON_TIDAL_VAULT", "hueco de la costa"))
+        self.assertIn("nombre de un punto", str(e.exception))
+
     def test_paredes_de_cueva(self):
         # Sala de 3x3 con borde de roca: cada casilla de pared lleva la pieza que mira a la roca de detrás,
         # y el exterior de al lado es esa roca maciza.

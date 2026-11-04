@@ -214,6 +214,13 @@ def leer_plano(texto, origen_fichero="plano"):
                 raise ErrorPlano(f"{origen_fichero}:{numero}: el margen es un número de casillas entre 0 y 30")
             opciones["margen"] = int(valor)
             continue
+        if clave == "entrada_mundo":
+            # Punto con nombre (waypoint) del mapa principal junto al que va el portal de entrada.
+            if not re.fullmatch(r"[A-Za-z0-9_]+", valor):
+                raise ErrorPlano(f"{origen_fichero}:{numero}: 'entrada_mundo:' lleva el nombre de un punto del mapa "
+                                 "principal, solo letras sin tilde, números y _ (entrada_mundo: DUNGEON_TIDAL_VAULT)")
+            opciones["entrada_mundo"] = valor
+            continue
         if clave not in ("nombre", "origen", "suelo", "pared", "paredes_auto", "rampa"):
             raise ErrorPlano(f"{origen_fichero}:{numero}: opción desconocida '{clave}'")
         opciones[clave] = valor
@@ -775,6 +782,7 @@ def generar(opciones, filas, materiales, origen_fichero="plano"):
         "paredes": len(paredes),
         "exterior": len(m.tiles) - len(listadas),
         "relleno": [z for z in sorted(zs) if exterior[z]],
+        "entrada_mundo": opciones.get("entrada_mundo"),
     }
     return m, info
 
@@ -810,6 +818,7 @@ def lua_de(mapas):
         "-- relleno: pisos con exterior, que llega hasta las esquinas de ocupa. subidas: {rampa, a dónde se sale arriba}.",
         "-- grupos: cada pull (mancha de monstruos del plano), con su radio de aggro y {x, y, z, monstruo} de cada uno.",
         "-- cofres: dónde aparece el cofre al morir entero su grupo (el jefe final), y qué puede dar ({ID, cantidad}).",
+        "-- entrada_mundo: punto con nombre del mapa principal junto al que va el portal de entrada (si no, el templo).",
         "",
         "-- Se suma a Nocthold.mapas (puede haber otro fichero igual con mapas que no están en el repositorio).",
         "",
@@ -827,6 +836,8 @@ def lua_de(mapas):
             ox1, oy1, ox2, oy2 = info["ocupa"]
             lineas.append(f"\t\tpisos = {{{pisos}}}, exterior = {info['exterior']}, relleno = {{{relleno}}}, "
                           f"ocupa = {{{ox1}, {oy1}, {ox2}, {oy2}}},")
+        if info.get("entrada_mundo"):
+            lineas.append(f'\t\tentrada_mundo = "{info["entrada_mundo"]}",')
         lineas.append("\t\tpuntos = {")
         for p, x, y, zz in info["puntos"]:
             lineas.append(f'\t\t\t["{p}"] = {{{x}, {y}, {zz}}},')

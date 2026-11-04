@@ -160,7 +160,24 @@ cd ~/nocthold/infra/canary
 
 Sustituye los mapas privados que hubiera, reinicia pruebas y dice qué ha cargado.
 `./nocthold.sh test mapas` sin fichero dice cuáles hay. Cada mapa tiene su portal
-junto al templo de Montag (`/town 1`).
+en su hueco del mapa del mundo (`entrada_mundo:` en el plano) o, si no, junto al
+templo de la ciudad 1.
+
+### Mapa principal propio (el mapa del mundo)
+
+El paquete también puede traer el mapa principal (por ejemplo `nocthold_world.otbm`
+con sus `nocthold_world-monster/-npc/-house/-zones.xml`). El arranque lo pone en
+`world/` en vez de `world/custom/` cuando se llama como `MAP_NAME`. Para usarlo:
+
+```bash
+./nocthold.sh test mundo nocthold_world   # cambia MAP_NAME en test.env y reinicia
+./nocthold.sh test mundo                  # dice cuál hay
+./nocthold.sh test mundo canary           # vuelve al mapa de Canary
+```
+
+Si falta el `.otbm`, el arranque avisa y usa el mapa de Canary (no baja el de
+`MAP_URL`). La Forja Caída pone su portal en el punto `DUNGEON_FALLEN_FORGE` si el
+mapa lo tiene. Producción no cambia: sigue con su mapa de siempre.
 
 Además, cada vez que arranca, el servidor deja una copia de su base de datos
 dentro del volumen `server-data`.

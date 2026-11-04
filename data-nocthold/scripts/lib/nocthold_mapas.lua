@@ -6,6 +6,7 @@
 -- relleno: pisos con exterior, que llega hasta las esquinas de ocupa. subidas: {rampa, a dónde se sale arriba}.
 -- grupos: cada pull (mancha de monstruos del plano), con su radio de aggro y {x, y, z, monstruo} de cada uno.
 -- cofres: dónde aparece el cofre al morir entero su grupo (el jefe final), y qué puede dar ({ID, cantidad}).
+-- entrada_mundo: punto con nombre del mapa principal junto al que va el portal de entrada (si no, el templo).
 
 -- Se suma a Nocthold.mapas (puede haber otro fichero igual con mapas que no están en el repositorio).
 
