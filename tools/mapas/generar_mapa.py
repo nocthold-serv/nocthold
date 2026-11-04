@@ -315,20 +315,26 @@ def _bordes(material_en, c, f, bordes):
     for material, piezas in sorted(bordes.items(), key=lambda kv: kv[1]["orden"]):
         if material == propio or piezas["orden"] <= orden_propio:
             continue
-        es = {nombre: material_en.get((c + dc, f + dr)) == material
-              for nombre, dc, dr in (("n", 0, -1), ("s", 0, 1), ("o", -1, 0), ("e", 1, 0),
-                                     ("no", -1, -1), ("ne", 1, -1), ("so", -1, 1), ("se", 1, 1))}
-        usados = set()
-        for a, b in (("n", "o"), ("n", "e"), ("s", "o"), ("s", "e")):
-            if es[a] and es[b]:
-                items.append(piezas["d" + a + b])
-                usados.update((a, b))
-        for lado in ("n", "e", "s", "o"):
-            if es[lado] and lado not in usados:
-                items.append(piezas[lado])
-        for esquina in ("no", "ne", "so", "se"):
-            if es[esquina] and not es[esquina[0]] and not es[esquina[1]]:
-                items.append(piezas["e" + esquina])
+        items.extend(_piezas_borde(lambda dc, dr: material_en.get((c + dc, f + dr)) == material, piezas))
+    return items
+
+
+def _piezas_borde(hay, piezas):
+    """Piezas de un borde del RME según en qué vecinas hay (hay(dc, dr) -> bool): lados, dos lados a la vez
+    y esquinas sueltas."""
+    es = {nombre: hay(dc, dr) for nombre, dc, dr in (("n", 0, -1), ("s", 0, 1), ("o", -1, 0), ("e", 1, 0),
+                                                       ("no", -1, -1), ("ne", 1, -1), ("so", -1, 1), ("se", 1, 1))}
+    items, usados = [], set()
+    for a, b in (("n", "o"), ("n", "e"), ("s", "o"), ("s", "e")):
+        if es[a] and es[b]:
+            items.append(piezas["d" + a + b])
+            usados.update((a, b))
+    for lado in ("n", "e", "s", "o"):
+        if es[lado] and lado not in usados:
+            items.append(piezas[lado])
+    for esquina in ("no", "ne", "so", "se"):
+        if es[esquina] and not es[esquina[0]] and not es[esquina[1]]:
+            items.append(piezas["e" + esquina])
     return items
 
 
@@ -359,7 +365,10 @@ def generar(opciones, filas, materiales, origen_fichero="plano"):
     def pared_de(nombre_pared, donde):
         if nombre_pared not in materiales["paredes"]:
             raise ErrorPlano(f"{donde}: pared '{nombre_pared}' desconocida. Hay: {', '.join(materiales['paredes'])}")
-        return materiales["paredes"][nombre_pared]
+        pared = materiales["paredes"][nombre_pared]
+        if "macizo" in pared:
+            suelo_de(pared["macizo"], f"{donde}: macizo de la pared '{nombre_pared}'")
+        return pared
 
     def rampa_de(nombre_rampa, donde):
         if nombre_rampa not in materiales.get("rampas", {}):
@@ -465,6 +474,22 @@ def generar(opciones, filas, materiales, origen_fichero="plano"):
                     return zonas[capa_zonas[z][vecina]]
         return defecto
 
+    def cueva_en(z, c, f):
+        """La pared de cueva (borde de roca) de la casilla, si es una pared de una zona con 'pared: cueva ...'."""
+        if celdas[z].get((c, f)) not in ("#", "+"):
+            return None
+        pared = materiales["paredes"][zona_en(z, c, f)["pared"]]
+        return pared if "macizo" in pared else None
+
+    def roca_junto(z, c, f):
+        """Para el exterior: la roca maciza de la cueva de al lado (detrás del borde de roca), si la hay."""
+        for dc in (-1, 0, 1):
+            for dr in (-1, 0, 1):
+                pared = cueva_en(z, c + dc, f + dr)
+                if pared:
+                    return pared["macizo"]
+        return None
+
     # Exterior: lo que rodea el dibujo (hasta 'margen' casillas más allá) se rellena con un suelo, para que
     # no se vea el fondo vacío. "exterior: tierra" vale para todos los pisos; "exterior 6: nada" lo quita en uno.
     margen = opciones.get("margen", MARGEN)
@@ -484,7 +509,11 @@ def generar(opciones, filas, materiales, origen_fichero="plano"):
         material_fuera[z] = material
 
     def material_exterior(z, cf):
-        """El exterior toma el suelo de la zona dibujada en la capa de zonas o, si no hay, el de 'exterior:'."""
+        """El exterior toma la roca de la cueva de al lado, el suelo de la zona dibujada en la capa de zonas o,
+        si no hay, el de 'exterior:'."""
+        roca = roca_junto(z, *cf)
+        if roca:
+            return roca
         letra = capa_zonas[z].get(cf)
         return zonas[letra]["suelo"] if letra is not None else material_fuera[z]
 
@@ -566,7 +595,25 @@ def generar(opciones, filas, materiales, origen_fichero="plano"):
             suelo = suelo_forzado.get((z, c, f)) or _suelo_en(x, y, materiales["suelos"][zona["suelo"]])
             t = otbm.Tile(x, y, z, ground=suelo)
             pieza = None
-            if ch in "#+":
+            cueva = cueva_en(z, c, f)
+            if cueva:
+                # Borde de roca (como las cuevas de Tibia): las piezas que miran a la roca maciza de detrás.
+                if ch == "+":
+                    raise ErrorPlano(f"{donde}: una pared de cueva no tiene puertas")
+                piezas = _piezas_borde(lambda dc, dr: (c + dc, f + dr) not in celdas[z], cueva)
+                if piezas:
+                    t.items.extend(piezas)
+                    paredes.add((x, y, z))
+                else:
+                    # Pared fina entre dos suelos: tierra que no se puede pisar, sin borde.
+                    t.ground = _suelo_en(x, y, materiales["suelos"]["tierra"])
+                    extra[(x, y, z)] = {"objetos": [], "bloquea": True}
+                    listadas.add((x, y, z))
+                    if (c, f) in capa_objetos[z]:
+                        raise ErrorPlano(donde_en(z, f"capa objetos, fila {f + 1}, columna {c + 1}: no puede haber objetos en una pared de cueva"))
+                    m.add(t)
+                    continue
+            elif ch in "#+":
                 pared = materiales["paredes"][zona["pared"]]
                 pieza = _orientacion(es_muro(c, f - 1), es_muro(c - 1, f), es_muro(c + 1, f), es_muro(c, f + 1), pared)
                 if ch == "#":
@@ -647,6 +694,33 @@ def generar(opciones, filas, materiales, origen_fichero="plano"):
         for letra in opciones.get(clave, {}):
             if letra not in grupos:
                 raise ErrorPlano(f"{origen_fichero}: hay '{clave[:-1]} {letra}:' pero ninguna '{letra}' en el dibujo")
+    # Pulls: cada mancha de monstruos (a 2 casillas o menos unos de otros, en el mismo piso) es un grupo que
+    # se despierta entero. La letra solo dice qué monstruo es, así que un pull puede mezclar monstruos.
+    todos = sorted(((z, y, x, letra) for letra, ps in grupos.items() for x, y, z in ps))
+    padre = list(range(len(todos)))
+
+    def raiz(i):
+        while padre[i] != i:
+            padre[i] = padre[padre[i]]
+            i = padre[i]
+        return i
+    por_casilla = {(z, y, x): i for i, (z, y, x, _) in enumerate(todos)}
+    for i, (z, y, x, _) in enumerate(todos):
+        for dy in range(-2, 3):
+            for dx in range(-2, 3):
+                j = por_casilla.get((z, y + dy, x + dx))
+                if j is not None:
+                    padre[raiz(i)] = raiz(j)
+    manchas = {}
+    for i in range(len(todos)):
+        manchas.setdefault(raiz(i), []).append(todos[i])
+    pulls = {}
+    for numero, mancha in enumerate(sorted(manchas.values()), start=1):
+        letras = sorted({letra for *_, letra in mancha})
+        radios = [opciones.get("radios", {})[letra] for letra in letras if letra in opciones.get("radios", {})]
+        pulls[str(numero)] = {"letras": letras, "radio": max(radios) if radios else None,
+                              "monstruos": [(x, y, z, opciones.get("grupos", {}).get(letra)) for z, y, x, letra in mancha]}
+
     cofres = []
     for letra, cofre in sorted(opciones.get("cofres", {}).items()):
         if len(marcas.get(letra, [])) != 1:
@@ -655,10 +729,14 @@ def generar(opciones, filas, materiales, origen_fichero="plano"):
         if cofre["grupo"] not in grupos:
             raise ErrorPlano(f"{origen_fichero}: 'cofre {letra}: {cofre['grupo']}' pero no hay ninguna '{cofre['grupo']}' "
                              "(el grupo del jefe) en el dibujo")
+        del_jefe = [n for n, p in pulls.items() if cofre["grupo"] in p["letras"]]
+        if len(del_jefe) != 1:
+            raise ErrorPlano(f"{origen_fichero}: el jefe del cofre '{letra}' (la '{cofre['grupo']}') tiene que ser un solo pull, "
+                             f"y está en {len(del_jefe)} sitios separados")
         x, y, z = marcas[letra][0]
         if (x, y, z) in extra:
             raise ErrorPlano(f"{origen_fichero}: el cofre '{letra}' necesita una casilla libre, sin objetos")
-        cofres.append({"pos": (x, y, z), "grupo": cofre["grupo"], "botin": cofre["botin"], "premios": cofre["premios"]})
+        cofres.append({"pos": (x, y, z), "grupo": del_jefe[0], "botin": cofre["botin"], "premios": cofre["premios"]})
     for letra in subidas:
         if not any(letra in celdas[z].values() for z in zs):
             raise ErrorPlano(f"{origen_fichero}: hay 'subida {letra}:' pero ninguna '{letra}' en el dibujo")
@@ -675,9 +753,7 @@ def generar(opciones, filas, materiales, origen_fichero="plano"):
         "ocupa": (min(xs), min(ys), max(xs), max(ys)),
         "pisos": sorted(zs),
         "puntos": puntos,
-        "grupos": {letra: {"monstruo": opciones.get("grupos", {}).get(letra), "radio": opciones.get("radios", {}).get(letra),
-                           "posiciones": grupos[letra]}
-                   for letra in sorted(grupos)},
+        "grupos": pulls,
         "portales": portales,
         "cofres": cofres,
         "subidas": subidas_info,
@@ -721,7 +797,7 @@ def lua_de(mapas):
         "-- y, si tiene decoración o no se puede pisar: {..., {objetos de decoración}, bloquea el paso}.",
         "-- Las casillas de otro piso que el de z llevan z = N. El exterior (relleno de alrededor) no se lista.",
         "-- relleno: pisos con exterior, que llega hasta las esquinas de ocupa. subidas: {rampa, a dónde se sale arriba}.",
-        "-- grupos: cada letra minúscula del plano es un grupo de monstruos (un pull); posiciones = dónde va cada uno.",
+        "-- grupos: cada pull (mancha de monstruos del plano), con su radio de aggro y {x, y, z, monstruo} de cada uno.",
         "-- cofres: dónde aparece el cofre al morir entero su grupo (el jefe final), y qué puede dar ({ID, cantidad}).",
         "",
         "-- Se suma a Nocthold.mapas (puede haber otro fichero igual con mapas que no están en el repositorio).",
@@ -762,11 +838,11 @@ def lua_de(mapas):
                 lineas.append(f'\t\t\t{{{x}, {y}, {zz}, grupo = "{cofre["grupo"]}", premios = {cofre["premios"]}, botin = {{{botin}}}}},')
             lineas.append("\t\t},")
         lineas.append("\t\tgrupos = {")
-        for letra, g in info["grupos"].items():
-            monstruo = f'"{g["monstruo"]}"' if g["monstruo"] else "nil"
-            posiciones = ", ".join(f"{{{x}, {y}, {zz}}}" for x, y, zz in g["posiciones"])
+        for numero, g in info["grupos"].items():
+            monstruos = ", ".join(f'{{{x}, {y}, {zz}, {chr(34) + nombre + chr(34) if nombre else "nil"}}}'
+                                  for x, y, zz, nombre in g["monstruos"])
             radio = g["radio"] if g["radio"] else "nil"
-            lineas.append(f'\t\t\t["{letra}"] = {{monstruo = {monstruo}, radio = {radio}, posiciones = {{{posiciones}}}}},')
+            lineas.append(f'\t\t\t["{numero}"] = {{radio = {radio}, monstruos = {{{monstruos}}}}},')
         lineas.append("\t\t},")
         lineas.append("\t\tcasillas = {")
         for key in sorted(info["listadas"], key=lambda k: (k[2] != z, k[2], k[1], k[0])):
@@ -853,7 +929,7 @@ def main(argv=None):
         x1, y1, x2, y2, z = info["caja"]
         print(f"{info['nombre']}: {info['suelos']} casillas de suelo y {info['paredes']} de pared, "
               f"de {x1},{y1} a {x2},{y2} (pisos {', '.join(str(p) for p in info['pisos'])}; {info['exterior']} de exterior). Puntos: {', '.join(p for p, *_ in info['puntos'])}. "
-              f"Grupos: {len(info['grupos'])} ({sum(len(g['posiciones']) for g in info['grupos'].values())} monstruos).")
+              f"Grupos: {len(info['grupos'])} ({sum(len(g['monstruos']) for g in info['grupos'].values())} monstruos).")
     print(f"Escritos en {salida_mapas}/ y {salida_lua}.")
     return 0
 

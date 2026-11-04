@@ -4,7 +4,7 @@
 -- y, si tiene decoración o no se puede pisar: {..., {objetos de decoración}, bloquea el paso}.
 -- Las casillas de otro piso que el de z llevan z = N. El exterior (relleno de alrededor) no se lista.
 -- relleno: pisos con exterior, que llega hasta las esquinas de ocupa. subidas: {rampa, a dónde se sale arriba}.
--- grupos: cada letra minúscula del plano es un grupo de monstruos (un pull); posiciones = dónde va cada uno.
+-- grupos: cada pull (mancha de monstruos del plano), con su radio de aggro y {x, y, z, monstruo} de cada uno.
 -- cofres: dónde aparece el cofre al morir entero su grupo (el jefe final), y qué puede dar ({ID, cantidad}).
 
 -- Se suma a Nocthold.mapas (puede haber otro fichero igual con mapas que no están en el repositorio).
@@ -32,10 +32,10 @@ for nombre, mapa in pairs({
 			{{64006, 64106, 7}, {64006, 64105, 6}},
 		},
 		cofres = {
-			{64013, 64114, 7, grupo = "j", premios = 1, botin = {{3031, 50}, {3035, 2}}},
+			{64013, 64114, 7, grupo = "1", premios = 1, botin = {{3031, 50}, {3035, 2}}},
 		},
 		grupos = {
-			["j"] = {monstruo = "El Guardián de Hierro", radio = 2, posiciones = {{64010, 64114, 7}}},
+			["1"] = {radio = 2, monstruos = {{64010, 64114, 7, "El Guardián de Hierro"}}},
 		},
 		casillas = {
 			{63999, 64099, 429, 1296, false},

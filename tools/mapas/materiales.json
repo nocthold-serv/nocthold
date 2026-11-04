@@ -1,5 +1,5 @@
 {
-  "_nota": "Suelos, paredes y bordes que entiende generar_mapa.py. Los números son IDs de objeto de Canary 15.x (los mismos que ve el RME). Para los suelos con varias piezas, el número de al lado es el peso (cuántas veces sale más que las demás). Las paredes siguen las piezas del pincel del RME: horizontal, vertical, esquina y poste; una pieza con varios IDs es una lista de variantes (sale una u otra según la casilla, siempre la misma). test_mapas.py comprueba con data/items/appearances.dat que todo existe y es lo que dice ser. Las rampas (subidas entre pisos) son, para cada dirección en la que se camina para subir, [rampa, pie de la rampa], como el pincel del RME; test_mapas.py comprueba que la rampa cambia de piso hacia esa dirección (data/items/items.xml).",
+  "_nota": "Suelos, paredes y bordes que entiende generar_mapa.py. Los números son IDs de objeto de Canary 15.x (los mismos que ve el RME). Para los suelos con varias piezas, el número de al lado es el peso (cuántas veces sale más que las demás). Las paredes siguen las piezas del pincel del RME: horizontal, vertical, esquina y poste; una pieza con varios IDs es una lista de variantes (sale una u otra según la casilla, siempre la misma). test_mapas.py comprueba con data/items/appearances.dat que todo existe y es lo que dice ser. Las paredes cueva no son paredes sino el borde de roca del RME (con sus diagonales): la casilla de pared lleva el borde que toca la roca maciza de detrás (el suelo de macizo), así las esquinas salen redondeadas como en las cuevas de Tibia. Las rampas (subidas entre pisos) son, para cada dirección en la que se camina para subir, [rampa, pie de la rampa], como el pincel del RME; test_mapas.py comprueba que la rampa cambia de piso hacia esa dirección (data/items/items.xml).",
   "suelos": {
     "piedra gris": [[429, 1]],
     "piedra": [[436, 1]],
@@ -22,7 +22,11 @@
     "tierra": [[101, 600], [5711, 10], [5712, 1], [5713, 4], [5714, 5], [5715, 10], [5716, 1], [5717, 8], [5718, 1], [5719, 10], [5720, 3], [5721, 7], [5722, 9], [5723, 5], [5724, 2], [5725, 1], [5726, 10]],
     "fondo marino": [[9291, 800], [5405, 200], [5406, 2500], [5407, 2500], [5408, 2500], [5409, 2500]],
     "basalto": [[15000, 1], [15001, 1], [15002, 1], [15003, 1]],
-    "tierra maldita": [[10534, 2500], [10535, 1000]]
+    "tierra maldita": [[10534, 2500], [10535, 1000]],
+    "roca gruta": [[13644, 1], [13645, 1], [13594, 1]],
+    "roca basalto": [[15298, 2500], [15299, 2000], [15300, 2500], [15301, 2500]],
+    "roca arrecife": [[21560, 1], [21561, 1], [21562, 1], [21563, 1]],
+    "roca musgo": [[15347, 2000], [15348, 2500], [15349, 2500], [15350, 2500]]
   },
   "paredes": {
     "piedra": {"horizontal": 1295, "vertical": 1294, "esquina": 1298, "poste": 1296, "puerta_horizontal": 6252, "puerta_vertical": 6249},
@@ -31,7 +35,12 @@
     "piedra maciza": {"horizontal": [26950, 26951, 26952, 26953], "vertical": [26957, 26958, 26959, 26960], "esquina": 26962, "poste": 27021},
     "piedra oscura": {"horizontal": [22545, 22547], "vertical": [22544, 22549], "esquina": 22548, "poste": 22546},
     "huesos": {"horizontal": [6395, 6420], "vertical": [6394, 6419], "esquina": 6398, "poste": 6396},
-    "manos": {"horizontal": [33212, 33213, 33214, 33215, 33216, 33217], "vertical": [33218, 33219, 33220, 33221, 33222, 33223], "esquina": [33224, 33225, 33226], "poste": 33227}
+    "manos": {"horizontal": [33212, 33213, 33214, 33215, 33216, 33217], "vertical": [33218, 33219, 33220, 33221, 33222, 33223], "esquina": [33224, 33225, 33226], "poste": 33227},
+    "cueva tierra": {"macizo": "tierra", "n": 5631, "e": 5636, "s": 5637, "o": 5630, "eno": 5634, "ene": 5635, "eso": 5633, "ese": 5632, "dno": 5646, "dne": 5650, "dso": 5649, "dse": 5648},
+    "cueva gruta": {"macizo": "roca gruta", "n": 13599, "e": 13598, "s": 13600, "o": 13597, "eno": 13603, "ene": 13602, "eso": 13601, "ese": 13604, "dno": 13605, "dne": 13607, "dso": 13606, "dse": 13608},
+    "cueva basalto": {"macizo": "roca basalto", "n": 14859, "e": 14843, "s": 14850, "o": 14893, "eno": 14889, "ene": 14881, "eso": 14888, "ese": 14858, "dno": 14879, "dne": 14880, "dso": 15309, "dse": 15345},
+    "cueva arrecife": {"macizo": "roca arrecife", "n": 21510, "e": 21509, "s": 21511, "o": 21508, "eno": 21514, "ene": 21513, "eso": 21512, "ese": 21515, "dno": 21516, "dne": 21518, "dso": 21517, "dse": 21519},
+    "cueva musgo": {"macizo": "roca musgo", "n": 15267, "e": 15061, "s": 15069, "o": 15095, "eno": 15101, "ene": 15103, "eso": 15102, "ese": 15076, "dno": 15104, "dne": 15097, "dso": 15355, "dse": 15392}
   },
   "bordes": {
     "agua profunda": {"orden": 7600, "n": 4633, "e": 4634, "s": 4635, "o": 4636, "eno": 4641, "ene": 4642, "eso": 4643, "ese": 4644, "dno": 4637, "dne": 4638, "dso": 4639, "dse": 4640},

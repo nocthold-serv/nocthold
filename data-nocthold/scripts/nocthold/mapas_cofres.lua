@@ -87,12 +87,12 @@ function C.aparecer(nombre, datos)
 	return cofre
 end
 
--- Lo llama la zona de aggro cuando muere el último monstruo de un grupo ("mapa.letra").
+-- Lo llama la zona de aggro cuando muere el último monstruo de un pull ("mapa.número").
 function C.alVaciarGrupo(id)
-	local nombre, letra = tostring(id):match("^(.+)%.(%l)$")
+	local nombre, pull = tostring(id):match("^(.+)%.([^.]+)$")
 	local mapa = nombre and Nocthold.mapas and Nocthold.mapas[nombre]
 	for _, datos in ipairs(mapa and mapa.cofres or {}) do
-		if datos.grupo == letra then
+		if datos.grupo == pull then
 			C.aparecer(nombre, datos)
 		end
 	end

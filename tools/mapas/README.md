@@ -36,7 +36,7 @@ puntos para los jefes) y después se decora a mano en el RME.
 | `E` | entrada (obligatoria, solo una) |
 | `J` | jefe (si hay varias: `jefe`, `jefe2`...) |
 | `1` a `9` y otras mayúsculas | suelo con un punto con nombre (`1`, `2`... `k`) para los scripts |
-| `a` a `z` (minúsculas) | un monstruo del grupo (pull) de esa letra: todas las `c` son el grupo `c` |
+| `a` a `z` (minúsculas) | un monstruo (la letra dice cuál); cada mancha de monstruos es un pull |
 | espacio o `~` | nada |
 
 Con `paredes_auto: si` (lo normal) no hace falta dibujar paredes: toda casilla vacía que toca
@@ -54,7 +54,11 @@ destino T: jefe1             # la 'T' es un portal a otro punto de este mapa
 destino U: 32369 32241 7     # ...o a una casilla concreta X Y Z
 ```
 
-Los grupos se guardan en `nocthold_mapas.lua` (`grupos[letra] = {monstruo, radio, posiciones}`)
+**Pulls:** cada mancha de monstruos (letras a 2 casillas o menos unas de otras, en el mismo piso) es
+un pull que se despierta entero, aunque mezcle letras. Así se pueden poner muchos pulls con pocas letras:
+`grupo c:` dice qué monstruo es cada `c`, y `radio c:` vale para los pulls donde haya alguna `c` (si hay
+varias letras con radio, el mayor). Para que dos pulls no se junten, déjalos a 3 casillas o más.
+Se guardan en `nocthold_mapas.lua` (`grupos[número] = {radio, monstruos = {{x, y, z, monstruo}, ...}}`)
 para que el script de aggro cree los monstruos y su zona invisible. El `.otbm` no lleva monstruos.
 
 Los puntos quedan en el mapa como *waypoints* con el nombre `<mapa>.<punto>`, por ejemplo
@@ -181,6 +185,11 @@ que las puertas se abren sin llave.
   `marea negra` (brea), `agua profunda`, `agua negra`.
 - Paredes: `piedra` (con puertas), `roca`, `piedra clara`, `piedra maciza`, `piedra oscura`, `huesos`, `manos`.
   Una pieza de pared con varios IDs es una lista de variantes.
+- Paredes de cueva: `cueva tierra`, `cueva gruta`, `cueva basalto`, `cueva arrecife`, `cueva musgo`. No son
+  muros de ladrillo sino el borde de roca del RME, que tiene piezas en diagonal: las salas con formas
+  irregulares quedan redondeadas, sin escalones. Detrás del borde va su roca maciza (`roca gruta`,
+  `roca basalto`, `roca arrecife`, `roca musgo` o `tierra`); lo mejor es usar esa misma roca como `exterior`
+  del piso. No llevan puertas ni objetos colgados.
 - Rampas: `piedra`, `tierra`, `gruta`, `musgo`, `barro`, `agrietada`, `manos`. El test comprueba en
   `data/items/items.xml` que cada una sube hacia la dirección que dice.
 
