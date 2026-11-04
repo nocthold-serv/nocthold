@@ -149,16 +149,28 @@ local function checkGeneratedMaps()
 		for _, c in ipairs(mapa.casillas) do
 			local tile = Tile(Position(c[1], c[2], mapa.z))
 			local ground = tile and tile:getGround()
+			-- c = {x, y, suelo, pared o 0, zona protegida[, {decoración}, bloquea el paso]}
+			local blocks = c[4] ~= 0
+			if c[7] ~= nil then
+				blocks = c[7]
+			end
 			local problem
 			if not ground then
 				problem = "no hay casilla o no tiene suelo"
 			elseif ground:getId() ~= c[3] then
 				problem = "suelo " .. ground:getId() .. " en vez de " .. c[3]
 			elseif c[4] ~= 0 and not tile:getItemById(c[4]) then
-				problem = "falta el objeto " .. c[4]
-			elseif (c[4] ~= 0) ~= tile:hasProperty(CONST_PROP_BLOCKSOLID) then
-				problem = c[4] ~= 0 and "la pared no bloquea el paso" or "el suelo no se puede pisar"
-			elseif c[5] ~= tile:hasFlag(TILESTATE_PROTECTIONZONE) then
+				problem = "falta la pared " .. c[4]
+			end
+			for _, id in ipairs(c[6] or {}) do
+				if not problem and not tile:getItemById(id) then
+					problem = "falta el objeto " .. id
+				end
+			end
+			if not problem and blocks ~= tile:hasProperty(CONST_PROP_BLOCKSOLID) then
+				problem = blocks and "debería bloquear el paso y no lo bloquea" or "se debería poder pisar y no se puede"
+			end
+			if not problem and c[5] ~= tile:hasFlag(TILESTATE_PROTECTIONZONE) then
 				problem = c[5] and "debería ser zona protegida" or "no debería ser zona protegida"
 			end
 			if problem then

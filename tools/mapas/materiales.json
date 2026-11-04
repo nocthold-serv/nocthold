@@ -1,15 +1,38 @@
 {
-  "_nota": "Suelos y paredes que entiende generar_mapa.py. Los números son IDs de objeto de Canary 15.x (los mismos que ve el RME). Para los suelos con varias piezas, el número de al lado es el peso (cuántas veces sale más que las demás). Las paredes siguen las piezas del pincel del RME: horizontal, vertical, esquina y poste. test_mapas.py comprueba con data/items/appearances.dat que todo existe y es lo que dice ser.",
+  "_nota": "Suelos, paredes y bordes que entiende generar_mapa.py. Los números son IDs de objeto de Canary 15.x (los mismos que ve el RME). Para los suelos con varias piezas, el número de al lado es el peso (cuántas veces sale más que las demás). Las paredes siguen las piezas del pincel del RME: horizontal, vertical, esquina y poste; una pieza con varios IDs es una lista de variantes (sale una u otra según la casilla, siempre la misma). test_mapas.py comprueba con data/items/appearances.dat que todo existe y es lo que dice ser.",
   "suelos": {
     "piedra gris": [[429, 1]],
     "piedra": [[436, 1]],
     "marmol negro": [[410, 1]],
     "adoquin marron": [[7593, 1], [7595, 1], [7596, 1], [7597, 1], [7598, 1], [7599, 1], [7600, 1], [7601, 1]],
-    "tierra de cueva": [[351, 6], [352, 1], [353, 1], [354, 1], [355, 1], [7756, 2500], [10480, 1000]]
+    "tierra de cueva": [[351, 6], [352, 1], [353, 1], [354, 1], [355, 1], [7756, 2500], [10480, 1000]],
+    "templo mojado": [[13441, 1]],
+    "templo mojado oscuro": [[13444, 1]],
+    "marmol abisal": [[13430, 1], [13431, 1], [13432, 1], [13433, 1], [13434, 1], [13435, 1], [13436, 1], [13437, 1], [13438, 1]],
+    "marmol abisal roto": [[13457, 800], [13458, 1000], [13459, 1000], [13460, 100], [13461, 1000], [13462, 1000], [13463, 1000], [13464, 2500], [13465, 2500]],
+    "agua somera": [[13988, 1], [13989, 1]],
+    "musgo": [[15040, 1500], [15041, 1000], [15042, 2500], [15043, 2500], [15044, 2500], [15045, 2500], [15046, 1500], [15047, 2500]],
+    "fango negro": [[10549, 2500], [10550, 1000], [10551, 1000], [10552, 1000], [10553, 1000]],
+    "moho": [[15022, 500], [15023, 500], [15024, 1000], [15025, 2500], [15026, 2500], [15027, 1500]],
+    "losas oscuras": [[9849, 2500], [9850, 2000], [9851, 2000], [9852, 1000], [9853, 500], [9854, 300], [9855, 2500], [9856, 2500], [9857, 2500]],
+    "agua de sangre": [[32688, 2500], [32689, 1500], [32690, 1500], [32691, 1000], [32692, 2500], [32693, 2500]],
+    "marea negra": [[837, 850], [838, 50], [839, 50], [840, 50]],
+    "agua profunda": [[4597, 3], [4598, 1], [4599, 1], [4600, 1], [4601, 1], [4602, 1]],
+    "agua negra": [[12558, 1], [12559, 1], [12560, 1], [12561, 1], [12562, 1], [12563, 1]]
   },
   "paredes": {
     "piedra": {"horizontal": 1295, "vertical": 1294, "esquina": 1298, "poste": 1296, "puerta_horizontal": 6252, "puerta_vertical": 6249},
     "roca": {"horizontal": 1113, "vertical": 1112, "esquina": 1116, "poste": 1114},
-    "piedra clara": {"horizontal": 1547, "vertical": 1549, "esquina": 1550, "poste": 1551}
+    "piedra clara": {"horizontal": 1547, "vertical": 1549, "esquina": 1550, "poste": 1551},
+    "piedra maciza": {"horizontal": [26950, 26951, 26952, 26953], "vertical": [26957, 26958, 26959, 26960], "esquina": 26962, "poste": 27021},
+    "piedra oscura": {"horizontal": [22545, 22547], "vertical": [22544, 22549], "esquina": 22548, "poste": 22546},
+    "huesos": {"horizontal": [6395, 6420], "vertical": [6394, 6419], "esquina": 6398, "poste": 6396},
+    "manos": {"horizontal": [33212, 33213, 33214, 33215, 33216, 33217], "vertical": [33218, 33219, 33220, 33221, 33222, 33223], "esquina": [33224, 33225, 33226], "poste": 33227}
+  },
+  "bordes": {
+    "agua profunda": {"orden": 7600, "n": 4633, "e": 4634, "s": 4635, "o": 4636, "eno": 4641, "ene": 4642, "eso": 4643, "ese": 4644, "dno": 4637, "dne": 4638, "dso": 4639, "dse": 4640},
+    "agua negra": {"orden": 7500, "n": 12583, "e": 12584, "s": 12585, "o": 12586, "eno": 12591, "ene": 12592, "eso": 12593, "ese": 12594, "dno": 12587, "dne": 12588, "dso": 12589, "dse": 12590},
+    "fango negro": {"orden": 6700, "n": 10566, "e": 10567, "s": 10568, "o": 10569, "eno": 10570, "ene": 10571, "eso": 10572, "ese": 10573, "dno": 10574, "dne": 10575, "dso": 10576, "dse": 10577},
+    "moho": {"orden": 5800, "n": 15029, "e": 15030, "s": 15028, "o": 15031, "eno": 15038, "ene": 15039, "eso": 15037, "ese": 15036, "dno": 15034, "dne": 15035, "dso": 15033, "dse": 15032}
   }
 }

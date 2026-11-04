@@ -60,13 +60,64 @@ para que el script de aggro cree los monstruos y su zona invisible. El `.otbm` n
 Los puntos quedan en el mapa como *waypoints* con el nombre `<mapa>.<punto>`, por ejemplo
 `sala_prueba.jefe`. Desde Lua: `getWaypointPositionByName("sala_prueba.jefe")`.
 
+## Zonas: varios suelos y paredes en un mismo mapa
+
+`suelo:` y `pared:` son los de todo el mapa. Para cambiarlos en una parte, se define una zona
+con una letra y se dibuja debajo del plano, en una **capa** que va casilla a casilla con él:
+
+```
+zona f: suelo fango negro, pared huesos   # las dos cosas son opcionales
+zona n: suelo marea negra
+
+plano:
+...el dibujo de siempre...
+capa zonas:
+     fffff
+     ffnnf
+```
+
+Las paredes automáticas toman la zona del suelo de al lado. Si una zona tiene un suelo que
+no se pisa (agua, brea), esas casillas no se pueden pisar y el programa avisa si encima hay una
+entrada, un punto o un monstruo.
+
+**Bordes.** Algunos suelos tienen borde (`bordes` en `materiales.json`, los mismos del RME):
+el agua, la brea, el barro... El programa pone el borde en las casillas de alrededor, como el
+pincel del RME, y solo el del suelo de más `orden` sobre el de menos. Ojo: la orilla del agua
+profunda y del agua negra tampoco se pisa (como en Tibia).
+
+## Objetos de decoración
+
+Igual, con una capa de objetos. Cada letra es una lista de IDs (sale uno u otro según la
+casilla, siempre el mismo) o, para colgar en la pared, `pared <ID horizontal> <ID vertical>`:
+
+```
+objeto L: pared 11054 11055   # antorcha de calavera (solo en paredes rectas)
+objeto p: 10837 10838 10839   # columna de calaveras (no se pisa)
+objeto h: 3114 3115 3116      # huesos por el suelo
+
+capa objetos:
+  L
+     p  h
+```
+
+Lo colgado solo se ve en las paredes con su cara a la vista: las horizontales con suelo al sur
+y las verticales con suelo al este. Si una capa necesita llegar a la fila de paredes de encima
+del dibujo, deja una fila en blanco al principio del plano (y lo mismo con una columna a la
+izquierda): las capas cuentan las filas tal como están escritas.
+
+La prueba del servidor revisa también cada objeto y si la casilla se pisa o no.
+
 ## Materiales
 
 Están en `materiales.json`. Para añadir uno, busca los IDs en el RME y añádelos ahí; el test
-comprueba con `data/items/appearances.dat` que los suelos son suelo y las paredes bloquean.
+comprueba con `data/items/appearances.dat` que los suelos son suelo, que las paredes bloquean y
+que las puertas se abren sin llave.
 
-- Suelos: `piedra gris`, `piedra`, `marmol negro`, `adoquin marron`, `tierra de cueva` (mezcla piezas).
-- Paredes: `piedra` (con puertas), `roca`, `piedra clara`.
+- Suelos: `piedra gris`, `piedra`, `marmol negro`, `adoquin marron`, `tierra de cueva`, `templo mojado`,
+  `templo mojado oscuro`, `marmol abisal`, `marmol abisal roto`, `agua somera`, `musgo`, `fango negro`,
+  `moho`, `losas oscuras`, `agua de sangre`; y sin pisar: `marea negra` (brea), `agua profunda`, `agua negra`.
+- Paredes: `piedra` (con puertas), `roca`, `piedra clara`, `piedra maciza`, `piedra oscura`, `huesos`, `manos`.
+  Una pieza de pared con varios IDs es una lista de variantes.
 
 ## Diseños que no van al repositorio
 
@@ -105,4 +156,5 @@ python3 -m unittest discover -s tools/mapas -v
 
 - Un piso por plano (sin escaleras entre pisos).
 - Sin monstruos ni NPC colocados en el mapa (los pone el script de la mazmorra).
-- Sin bordes de suelo ni decoración: eso se hace en el RME.
+- Objetos de una sola casilla (nada de estatuas o sarcófagos de varias casillas).
+- Bordes solo de los suelos que tienen `bordes` en `materiales.json`.

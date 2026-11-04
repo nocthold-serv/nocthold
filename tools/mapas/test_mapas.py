@@ -115,6 +115,67 @@ class Plano(unittest.TestCase):
         with self.assertRaises(gm.ErrorPlano):
             generar(plano("ET\n", **{"destino T": "a ninguna parte"}))
 
+    def test_zonas_de_suelo_y_pared(self):
+        # La capa de zonas va casilla a casilla con el plano; una pared sin zona toma la de su suelo vecino.
+        texto = plano("\nE..\n...\n", **{"zona h": "suelo fango negro, pared huesos", "zona m": "suelo musgo"})
+        texto += "capa zonas:\n\nhh\n  m\n"
+        m, info = generar(texto)
+        mats = gm.cargar_materiales()
+        fango = {i for i, _ in mats["suelos"]["fango negro"]}
+        musgo = {i for i, _ in mats["suelos"]["musgo"]}
+        huesos = set(mats["paredes"]["huesos"]["horizontal"]) | {mats["paredes"]["huesos"]["esquina"]}
+        self.assertIn(m.tiles[(1000, 1000, 7)].ground, fango)
+        self.assertIn(m.tiles[(1001, 1000, 7)].ground, fango)
+        self.assertEqual(m.tiles[(1002, 1000, 7)].ground, 429)  # sin zona: el suelo por defecto
+        self.assertIn(m.tiles[(1002, 1001, 7)].ground, musgo)
+        self.assertIn(m.tiles[(1000, 999, 7)].items[0], huesos)  # pared encima de una casilla de fango
+        self.assertEqual(m.tiles[(1003, 999, 7)].items, [1295])  # pared de la esquina: piedra (no toca zona)
+
+    def test_objetos_de_decoracion(self):
+        # 3114 son huesos (se pisan), 5015/5016 una calavera colgada en pared horizontal/vertical,
+        # 13149 una columna (no se pisa).
+        # La fila en blanco de arriba y el espacio de la izquierda dejan sitio a las paredes automáticas,
+        # y la capa de objetos llega a ellas.
+        texto = plano("\n E...\n ....\n", **{"objeto b": "3114", "objeto c": "pared 5015 5016", "objeto k": "13149"})
+        texto += "capa objetos:\n  c\nc\n   bk\n"
+        m, info = generar(texto)
+        self.assertEqual(m.tiles[(1002, 999, 7)].items, [1295, 5015])  # pared horizontal + calavera
+        self.assertEqual(m.tiles[(1000, 1000, 7)].items, [1294, 5016])  # pared vertical + calavera
+        self.assertEqual(m.tiles[(1003, 1001, 7)].items, [3114])
+        self.assertEqual(m.tiles[(1004, 1001, 7)].items, [13149])
+        self.assertEqual(info["extra"][(1003, 1001, 7)], {"objetos": [3114], "bloquea": False})
+        self.assertEqual(info["extra"][(1004, 1001, 7)], {"objetos": [13149], "bloquea": True})
+        self.assertEqual(info["suelos"], 8)  # los objetos no convierten el suelo en pared
+        lua = gm.lua_de([(m, info)]).decode()
+        self.assertIn("{1004, 1001, 429, 0, false, {13149}, true}", lua)
+        self.assertIn("{1003, 1001, 429, 0, false, {3114}, false}", lua)
+        self.assertIn("{1002, 999, 429, 1295, false, {5015}, true}", lua)
+        self.assertEqual(otbm.read(otbm.write(m)).tiles, m.tiles)
+        with self.assertRaises(gm.ErrorPlano) as e:  # la calavera de pared en el suelo
+            generar(plano("E..\n", **{"objeto c": "pared 5015 5016"}) + "capa objetos:\n c\n")
+        self.assertIn("pared recta", str(e.exception))
+        with self.assertRaises(gm.ErrorPlano) as e:  # una columna encima de la entrada
+            generar(plano("E..\n", **{"objeto k": "13149"}) + "capa objetos:\nk\n")
+        self.assertIn("no se puede pisar", str(e.exception))
+        with self.assertRaises(gm.ErrorPlano) as e:
+            generar(plano("E..\n") + "capa objetos:\n z\n")
+        self.assertIn("no tiene 'objeto z:'", str(e.exception))
+
+    def test_suelo_que_no_se_pisa_y_bordes(self):
+        m, info = generar(plano("E...\n", **{"zona w": "suelo agua negra"}) + "capa zonas:\n   w\n")
+        self.assertEqual(info["extra"][(1003, 1000, 7)], {"objetos": [], "bloquea": True})
+        # La orilla del agua negra (borde del RME) cae en la casilla de al lado, y tampoco se pisa.
+        bordes = gm.cargar_materiales()["bordes"]["agua negra"]
+        self.assertEqual(info["extra"][(1002, 1000, 7)], {"objetos": [bordes["e"]], "bloquea": True})
+        self.assertNotIn((1001, 1000, 7), info["extra"])
+        # Barro alrededor de un charco: el agua (más "orden") pinta su borde sobre el barro, no al revés.
+        m, info = generar(plano("E...\n", suelo="fango negro", **{"zona w": "suelo agua negra"}) + "capa zonas:\n   w\n")
+        self.assertEqual(info["extra"][(1003, 1000, 7)], {"objetos": [], "bloquea": True})
+        self.assertEqual(info["extra"][(1002, 1000, 7)]["objetos"], [bordes["e"]])
+        with self.assertRaises(gm.ErrorPlano) as e:
+            generar(plano("E.\n", **{"zona w": "suelo agua negra"}) + "capa zonas:\n w\n")
+        self.assertIn("no se puede pisar", str(e.exception))
+
     def test_puntos_repetidos_y_letras(self):
         _, info = generar(plano("EJJ1N\n"))
         self.assertEqual([p for p, *_ in info["puntos"]], ["entrada", "jefe", "jefe2", "1", "n"])
@@ -165,11 +226,12 @@ class Materiales(unittest.TestCase):
         for nombre, piezas in self.materiales["paredes"].items():
             for pieza in ("horizontal", "vertical", "esquina", "poste"):
                 self.assertIn(pieza, piezas, f"a la pared '{nombre}' le falta la pieza {pieza}")
-            for pieza, item_id in piezas.items():
-                with self.subTest(pared=nombre, pieza=pieza):
-                    self.assertIn(item_id, self.objetos)
-                    self.assertTrue(self.objetos[item_id]["bloquea"])
-                    self.assertFalse(self.objetos[item_id]["suelo"])
+            for pieza, ids in piezas.items():
+                for item_id in ids if isinstance(ids, list) else [ids]:
+                    with self.subTest(pared=nombre, pieza=pieza, id=item_id):
+                        self.assertIn(item_id, self.objetos)
+                        self.assertTrue(self.objetos[item_id]["bloquea"])
+                        self.assertFalse(self.objetos[item_id]["suelo"])
 
     def test_puertas_abribles_sin_llave(self):
         # data/libs/tables/doors.lua dice qué puertas son "cerradas con llave" (lockedDoor):
