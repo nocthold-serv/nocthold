@@ -8,7 +8,8 @@
 --   casilla a casilla y sus portales, la sala de La Forja Caída casilla a casilla, los 5 NPC, el
 --   portal del templo, el altar, la barrera y el portal de salida, una piedra-llave de verdad, las
 --   zonas de aggro (grupos dormidos que se despiertan enteros al entrar alguien en su zona o al
---   recibir daño), y una expedición entera de llave 7 empezada desde el altar (6 fases, afijos,
+--   recibir daño), el cofre del jefe de un mapa generado (sale al matar al jefe y se abre una vez),
+--   y una expedición entera de llave 7 empezada desde el altar (6 fases, afijos,
 --   refuerzos de jefe, muertes, la piedra sube a 8, portal final, salida y limpieza) con un
 --   jugador simulado.
 -- Lo que NO puede probar sin un cliente conectado: lanzar los hechizos, hablar con los NPC
@@ -84,6 +85,7 @@ local function newFake(position, guid)
 	function f:teleportTo(p) self.position = p return true end
 	function f:addMoney(amount) self.money = (self.money or 0) + amount return true end
 	function f:sendTextMessage(_, text) self.messages[#self.messages + 1] = text return true end
+	function f:addItem(id, count) self.items = self.items or {} self.items[#self.items + 1] = { id, count } return true end
 	function f:getSlotItem(slot) if slot == CONST_SLOT_FIRST then return self.key end return nil end
 	return f
 end
@@ -458,7 +460,14 @@ local function checkAggro(siguiente)
 		A.provocadores[provocador:getId()] = nil
 		provocador:remove()
 		check(A.quitarGrupo("ci.a") and A.quitarGrupo("ci.b"), "aggro: no se pudieron quitar los grupos")
-		check(next(A.porZona) == nil and next(A.grupos) == nil, "aggro: quedan grupos o zonas apuntados")
+		local quedanApuntados = false
+		for id in pairs(A.grupos) do
+			quedanApuntados = quedanApuntados or id:sub(1, 3) == "ci."
+		end
+		for _, id in pairs(A.porZona) do
+			quedanApuntados = quedanApuntados or id:sub(1, 3) == "ci."
+		end
+		check(not quedanApuntados, "aggro: quedan grupos o zonas apuntados")
 		local quedan = 0
 		for _, c in ipairs(Game.getSpectators(arenaPos(48, 15), false, false, 8, 8, 8, 8)) do
 			if c:isMonster() then
@@ -496,6 +505,51 @@ local function checkAggro(siguiente)
 	end), 1500)
 end
 
+-- Cofre del jefe (scripts/nocthold/mapas_cofres.lua) con el jefe de sala_prueba (grupo j, cofre C):
+-- no está mientras vive el jefe, sale al morir, se abre una vez y da uno de los premios del botín.
+local function checkCofre(siguiente)
+	local C, A = Nocthold.cofres, Nocthold.aggro
+	local mapa = Nocthold.mapas and Nocthold.mapas.sala_prueba
+	local datos = mapa and mapa.cofres and mapa.cofres[1]
+	if not check(C and datos, "cofre: sala_prueba no tiene cofre en nocthold_mapas.lua") then
+		return siguiente()
+	end
+	local pos = Position(datos[1], datos[2], datos[3])
+	local id = "sala_prueba." .. datos.grupo
+	local jefes = A.monstruosVivos(id)
+	check(#jefes > 0, "cofre: el jefe de sala_prueba no se creó al arrancar")
+	check(Tile(pos) and Tile(pos):getItemById(C.ITEM) == nil, "cofre: el cofre ya está antes de matar al jefe")
+	for _, m in ipairs(jefes) do
+		m:addHealth(-m:getHealth(), COMBAT_PHYSICALDAMAGE)
+	end
+	addEvent(guarded("cofre", function()
+		local cofre = Tile(pos) and Tile(pos):getItemById(C.ITEM)
+		if not check(cofre and cofre:getActionId() == C.AID, "cofre: no apareció al morir el jefe") then
+			return siguiente()
+		end
+		local abre = newFake(pos, -4545)
+		local ok, dados = C.abrir(abre, cofre)
+		check(ok == true and dados and #dados == datos.premios, "cofre: no se abrió o no dio " .. datos.premios .. " premios")
+		local bien = abre.items and #abre.items == datos.premios
+		for _, it in ipairs(abre.items or {}) do
+			local enBotin = false
+			for _, b in ipairs(datos.botin) do
+				enBotin = enBotin or (b[1] == it[1] and b[2] == it[2])
+			end
+			bien = bien and enBotin and ItemType(it[1]):getId() == it[1]
+		end
+		check(bien, "cofre: lo que dio no está en el botín del plano")
+		check(Tile(pos):getItemById(C.ITEM) == nil, "cofre: sigue ahí después de abrirlo")
+		-- Una sola vez: otro cofre en la misma casilla ya no da nada.
+		local otro = Game.createItem(C.ITEM, 1, pos)
+		otro:setActionId(C.AID)
+		check(C.abrir(abre, otro) == false and #abre.items == datos.premios, "cofre: se pudo abrir dos veces")
+		otro:remove()
+		logger.info("[NOCTHOLD-TEST] Cofre del jefe: sale al matarlo, se abre una vez y da " .. #abre.items .. " premio(s) del botín")
+		siguiente()
+	end), 500)
+end
+
 local function runDungeon()
 	-- Desde el altar con la piedra de nivel 7 (activa los dos afijos alfa).
 	local stranger = newFake(arenaPos(9, 15), -4343)
@@ -516,7 +570,9 @@ function selftest.onStartup()
 		staticChecks()
 		checkGeneratedMaps()
 		buildArena()
-		checkAggro(guarded("expedición", runDungeon))
+		checkAggro(guarded("cofre", function()
+			checkCofre(guarded("expedición", runDungeon))
+		end))
 	end), 3000)
 	return true
 end

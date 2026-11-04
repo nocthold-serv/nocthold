@@ -94,12 +94,60 @@ class Plano(unittest.TestCase):
         self.assertEqual(m.tiles[(1000, 1001, 7)].items, [pared["puerta_vertical"]])
 
     def test_grupos_de_pull(self):
-        _, info = generar(plano("E.aa.b\n.a....\n", **{"grupo a": "Sabueso de Ceniza", "radio b": "5"}))
+        # Cada mancha de monstruos (a 2 casillas o menos) es un pull, aunque mezcle letras; la letra es el monstruo.
+        _, info = generar(plano("E.aa.b....a\n.a........\n", **{"grupo a": "Sabueso de Ceniza", "radio b": "5"}))
         self.assertEqual(info["grupos"], {
-            "a": {"monstruo": "Sabueso de Ceniza", "radio": None, "posiciones": [(1002, 1000, 7), (1003, 1000, 7), (1001, 1001, 7)]},
-            "b": {"monstruo": None, "radio": 5, "posiciones": [(1005, 1000, 7)]},
+            "1": {"letras": ["a", "b"], "radio": 5, "monstruos": [
+                (1002, 1000, 7, "Sabueso de Ceniza"), (1003, 1000, 7, "Sabueso de Ceniza"), (1005, 1000, 7, None),
+                (1001, 1001, 7, "Sabueso de Ceniza")]},
+            "2": {"letras": ["a"], "radio": None, "monstruos": [(1010, 1000, 7, "Sabueso de Ceniza")]},
         })
-        self.assertEqual(info["suelos"], 12)  # los monstruos van sobre suelo normal
+        self.assertEqual(info["suelos"], 21)  # los monstruos van sobre suelo normal
+
+    def test_cofre_del_jefe(self):
+        texto = plano("E..j.C\n......\n", **{"grupo j": "El Guardián de Hierro", "cofre C": "j",
+                                              "botin C": "3031 x50, 3035", "premios C": "2"})
+        m, info = generar(texto)
+        self.assertEqual(info["cofres"], [{"pos": (1005, 1000, 7), "grupo": "1", "botin": [(3031, 50), (3035, 1)], "premios": 2}])
+        self.assertEqual(m.tiles[(1005, 1000, 7)].items, [])  # el cofre lo pone el servidor al morir el jefe
+        lua = gm.lua_de([(m, {**info, "exterior": 0, "relleno": []})]).decode()
+        self.assertIn('{1005, 1000, 7, grupo = "1", premios = 2, botin = {{3031, 50}, {3035, 1}}}', lua)
+        casos = {
+            texto.replace("cofre C: j", "cofre C: k"): "ninguna 'k'",
+            texto.replace("cofre C: j", "cofre C: J"): "letra minúscula",
+            texto.replace("cofre C: j\n", ""): "falta 'cofre C:",
+            texto.replace("botin C: 3031 x50, 3035\n", ""): "falta 'botin C:",
+            texto.replace("3035", "1956"): "no se puede coger",
+            texto.replace("3035", "3035 x500"): "lista de IDs",
+            texto.replace("premios C: 2", "premios C: 0"): "de 1 a 10",
+            texto.replace("E..j.C", "E..jCC"): "exactamente una vez",
+            texto.replace("E..j.C\n......\n", "E..j.C\n.......j\n"): "un solo pull",
+        }
+        for mal, mensaje in casos.items():
+            with self.subTest(mensaje=mensaje):
+                with self.assertRaises(gm.ErrorPlano) as e:
+                    generar(mal)
+                self.assertIn(mensaje, str(e.exception))
+
+    def test_paredes_de_cueva(self):
+        # Sala de 3x3 con borde de roca: cada casilla de pared lleva la pieza que mira a la roca de detrás,
+        # y el exterior de al lado es esa roca maciza.
+        cueva = gm.cargar_materiales()["paredes"]["cueva basalto"]
+        roca = {i for i, _ in gm.cargar_materiales()["suelos"]["roca basalto"]}
+        m, info = generar(plano("...\n.E.\n...\n", pared="cueva basalto", exterior="fondo marino", margen="3"))
+        piezas = lambda x, y: [otbm.item_id(i) for i in m.tiles[(x, y, 7)].items]
+        self.assertEqual(piezas(1001, 999), [cueva["n"]])       # pared de arriba: roca al norte
+        self.assertEqual(piezas(999, 999), [cueva["dno"]])      # esquina: roca al norte y al oeste
+        self.assertEqual(piezas(1003, 1001), [cueva["e"]])
+        self.assertEqual(info["paredes"], 16)
+        self.assertIn(m.tiles[(1001, 998, 7)].ground, roca)      # detrás del borde, roca maciza
+        self.assertNotIn(m.tiles[(1001, 996, 7)].ground, roca)   # más allá, el exterior de siempre
+        # Pared fina entre dos salas: no hay roca detrás, así que es roca maciza (no se pisa).
+        m, info = generar(plano("..E\n...\n\n...\n...\n", pared="cueva basalto"))
+        self.assertIn(m.tiles[(1001, 1002, 7)].ground, roca)
+        self.assertTrue(info["extra"][(1001, 1002, 7)]["bloquea"])
+        with self.assertRaises(gm.ErrorPlano):
+            generar(plano("E.+..\n", pared="cueva basalto"))
 
     def test_portales(self):
         m, info = generar(plano("ES.T\n..K.\n", **{"destino S": "templo", "destino T": "jefe1", "punto K": "jefe1"}))
@@ -283,7 +331,13 @@ class Materiales(unittest.TestCase):
 
     def test_paredes_existen_y_bloquean(self):
         for nombre, piezas in self.materiales["paredes"].items():
-            for pieza in ("horizontal", "vertical", "esquina", "poste"):
+            if "macizo" in piezas:  # pared de cueva: las 12 piezas del borde de roca y su roca maciza
+                piezas = dict(piezas)
+                self.assertIn(piezas.pop("macizo"), self.materiales["suelos"])
+                necesarias = ("n", "e", "s", "o", "eno", "ene", "eso", "ese", "dno", "dne", "dso", "dse")
+            else:
+                necesarias = ("horizontal", "vertical", "esquina", "poste")
+            for pieza in necesarias:
                 self.assertIn(pieza, piezas, f"a la pared '{nombre}' le falta la pieza {pieza}")
             for pieza, ids in piezas.items():
                 for item_id in ids if isinstance(ids, list) else [ids]:

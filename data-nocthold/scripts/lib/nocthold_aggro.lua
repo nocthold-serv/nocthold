@@ -168,30 +168,38 @@ function A.prepararMapa(nombre)
 	if not mapa then
 		return 0, 0, { "no existe el mapa " .. tostring(nombre) }
 	end
-	local letras = {}
-	for letra in pairs(mapa.grupos or {}) do
-		letras[#letras + 1] = letra
+	local claves = {}
+	for clave in pairs(mapa.grupos or {}) do
+		claves[#claves + 1] = clave
 	end
-	table.sort(letras)
+	table.sort(claves, function(a, b)
+		return (tonumber(a) or 0) < (tonumber(b) or 0)
+	end)
 
+	-- Mazmorra rehecha: el cofre del jefe de la vez anterior (si nadie lo abrió) se va.
+	if Nocthold.cofres then
+		Nocthold.cofres.quitarDe(nombre)
+	end
 	local grupos, total = 0, 0
-	for _, letra in ipairs(letras) do
-		local datos = mapa.grupos[letra]
-		local id = nombre .. "." .. letra
+	for _, clave in ipairs(claves) do
+		local datos = mapa.grupos[clave]
+		local id = nombre .. "." .. clave
 		A.quitarGrupo(id)
-		if not datos.monstruo then
-			avisos[#avisos + 1] = "grupo " .. letra .. " sin monstruo en el plano"
-		else
-			local creados = {}
-			for _, p in ipairs(datos.posiciones or {}) do
-				local m = Game.createMonster(Nocthold.latin1(datos.monstruo), Position(p[1], p[2], p[3]), true, true)
+		local creados = {}
+		for _, p in ipairs(datos.monstruos or {}) do
+			if not p[4] then
+				avisos[#avisos + 1] = "pull " .. clave .. ": una letra sin 'grupo X: monstruo' en el plano"
+			else
+				local m = Game.createMonster(Nocthold.latin1(p[4]), Position(p[1], p[2], p[3]), true, true)
 				if m then
 					m:setDormant(true)
 					creados[#creados + 1] = m
 				else
-					avisos[#avisos + 1] = "no se pudo crear " .. datos.monstruo .. " en " .. p[1] .. "," .. p[2] .. "," .. p[3]
+					avisos[#avisos + 1] = "no se pudo crear " .. p[4] .. " en " .. p[1] .. "," .. p[2] .. "," .. p[3]
 				end
 			end
+		end
+		if #creados > 0 then
 			local g, motivo = A.crearGrupo(id, creados, datos.radio)
 			if g then
 				grupos = grupos + 1

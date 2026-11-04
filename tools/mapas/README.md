@@ -36,7 +36,7 @@ puntos para los jefes) y después se decora a mano en el RME.
 | `E` | entrada (obligatoria, solo una) |
 | `J` | jefe (si hay varias: `jefe`, `jefe2`...) |
 | `1` a `9` y otras mayúsculas | suelo con un punto con nombre (`1`, `2`... `k`) para los scripts |
-| `a` a `z` (minúsculas) | un monstruo del grupo (pull) de esa letra: todas las `c` son el grupo `c` |
+| `a` a `z` (minúsculas) | un monstruo (la letra dice cuál); cada mancha de monstruos es un pull |
 | espacio o `~` | nada |
 
 Con `paredes_auto: si` (lo normal) no hace falta dibujar paredes: toda casilla vacía que toca
@@ -54,11 +54,31 @@ destino T: jefe1             # la 'T' es un portal a otro punto de este mapa
 destino U: 32369 32241 7     # ...o a una casilla concreta X Y Z
 ```
 
-Los grupos se guardan en `nocthold_mapas.lua` (`grupos[letra] = {monstruo, radio, posiciones}`)
+**Pulls:** cada mancha de monstruos (letras a 2 casillas o menos unas de otras, en el mismo piso) es
+un pull que se despierta entero, aunque mezcle letras. Así se pueden poner muchos pulls con pocas letras:
+`grupo c:` dice qué monstruo es cada `c`, y `radio c:` vale para los pulls donde haya alguna `c` (si hay
+varias letras con radio, el mayor). Para que dos pulls no se junten, déjalos a 3 casillas o más.
+Se guardan en `nocthold_mapas.lua` (`grupos[número] = {radio, monstruos = {{x, y, z, monstruo}, ...}}`)
 para que el script de aggro cree los monstruos y su zona invisible. El `.otbm` no lleva monstruos.
 
 Los puntos quedan en el mapa como *waypoints* con el nombre `<mapa>.<punto>`, por ejemplo
 `sala_prueba.jefe`. Desde Lua: `getWaypointPositionByName("sala_prueba.jefe")`.
+
+## Cofre del jefe final
+
+```
+grupo j: El Guardián de Hierro   # el jefe final es un grupo más (aquí, la 'j' del dibujo)
+cofre C: j                       # la 'C' del dibujo es donde sale el cofre al morir el grupo 'j'
+botin C: 3031 x50, 3035 x2       # lo que puede salir: IDs (con su cantidad), uno al azar por premio
+premios C: 1                     # cuántos objetos da (1-10; si no, 1)
+```
+
+Mientras vive el jefe, la casilla `C` es suelo normal. Cuando muere el último monstruo del grupo
+aparece un cofre del tesoro (que brilla) y se avisa a los que están dentro. Cualquiera lo abre
+usándolo, sin comandos, y **solo una vez**: reparte los premios a jugadores al azar de la party del que
+lo abre que estén dentro de la mazmorra, y desaparece. Si alguien no puede cargar su premio, se queda
+en el suelo. Vuelve a salir cuando se rehace la mazmorra y se mata otra vez al jefe.
+El botín solo admite objetos que se pueden coger. Código: `data-nocthold/scripts/nocthold/mapas_cofres.lua`.
 
 ## Zonas: varios suelos y paredes en un mismo mapa
 
@@ -165,6 +185,11 @@ que las puertas se abren sin llave.
   `marea negra` (brea), `agua profunda`, `agua negra`.
 - Paredes: `piedra` (con puertas), `roca`, `piedra clara`, `piedra maciza`, `piedra oscura`, `huesos`, `manos`.
   Una pieza de pared con varios IDs es una lista de variantes.
+- Paredes de cueva: `cueva tierra`, `cueva gruta`, `cueva basalto`, `cueva arrecife`, `cueva musgo`. No son
+  muros de ladrillo sino el borde de roca del RME, que tiene piezas en diagonal: las salas con formas
+  irregulares quedan redondeadas, sin escalones. Detrás del borde va su roca maciza (`roca gruta`,
+  `roca basalto`, `roca arrecife`, `roca musgo` o `tierra`); lo mejor es usar esa misma roca como `exterior`
+  del piso. No llevan puertas ni objetos colgados.
 - Rampas: `piedra`, `tierra`, `gruta`, `musgo`, `barro`, `agrietada`, `manos`. El test comprueba en
   `data/items/items.xml` que cada una sube hacia la dirección que dice.
 

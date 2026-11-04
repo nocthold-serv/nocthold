@@ -17,6 +17,13 @@ subida R: norte
 destino S: templo
 destino T: entrada
 
+# El jefe (grupo j, un solo monstruo) y su cofre C: aparece cuando muere el jefe y se abre una vez.
+grupo j: El Guardián de Hierro
+radio j: 2
+cofre C: j
+botin C: 3031 x50, 3035 x2
+premios C: 1
+
 # Zonas y objetos (capas debajo del plano): la sala del jefe con barro negro, paredes de hueso
 # y un charco de brea; una antorcha de calavera, una columna de calaveras y unos huesos.
 zona f: suelo fango negro, pared huesos
@@ -40,7 +47,7 @@ PPPPPPP
             .
       ...........
       ...........
-      .....J....T
+      ....jJ.C..T
       ...........
 capa zonas:
 
