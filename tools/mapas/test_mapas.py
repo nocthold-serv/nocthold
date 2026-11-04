@@ -140,6 +140,22 @@ class Plano(unittest.TestCase):
             generar(texto.replace("DUNGEON_TIDAL_VAULT", "hueco de la costa"))
         self.assertIn("nombre de un punto", str(e.exception))
 
+    def test_salida_privada_un_lua_por_mapa(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as planos, tempfile.TemporaryDirectory() as salida:
+            for nombre, origen in (("uno", "1000 1000 7"), ("dos", "1100 1000 7")):
+                with open(os.path.join(planos, f"{nombre}.txt"), "w", encoding="utf-8") as f:
+                    f.write(plano("E..\n", nombre=nombre, origen=origen))
+            self.assertEqual(gm.main(["--planos", planos, "--salida", salida]), 0)
+            hechos = sorted(os.listdir(salida))
+            self.assertIn("nocthold_mapa_uno.lua", hechos)
+            self.assertIn("nocthold_mapa_dos.lua", hechos)
+            self.assertNotIn("nocthold_mapas_privados.lua", hechos)
+            with open(os.path.join(salida, "nocthold_mapa_uno.lua"), encoding="utf-8") as f:
+                lua = f.read()
+            self.assertIn('["uno"]', lua)
+            self.assertNotIn('["dos"]', lua)
+
     def test_paredes_de_cueva(self):
         # Sala de 3x3 con borde de roca: cada casilla de pared lleva la pieza que mira a la roca de detrás,
         # y el exterior de al lado es esa roca maciza.

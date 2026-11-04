@@ -208,6 +208,9 @@ El repositorio es público. Para un diseño propio, guarda los planos en otra ca
 python3 tools/mapas/generar_mapa.py --planos MI_CARPETA_DE_PLANOS --salida MI_CARPETA_DE_MAPAS
 ```
 
+Así cada mapa sale con su propio `nocthold_mapa_<nombre>.lua`, y un paquete con un solo mapa se
+suma a los que ya hay en el servidor de pruebas (`./nocthold.sh test mapas`, ver `infra/canary/README.md`).
+
 ## Qué genera
 
 En `data-nocthold/world/custom/`: `<nombre>.otbm` y sus cuatro ficheros de monstruos, NPC,
