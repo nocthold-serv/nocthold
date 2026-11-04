@@ -27,6 +27,10 @@ Cambia:
     (client/hechizos/descripciones.json) y nuestros iconos (iconos-32.png e
     iconos-20.png) en lugar de los de Tibia. El texto de la barra de acciones
     al pasar el ratón sale en español y con la descripción.
+  * Actualizador (Services.updater): al arrancar, el cliente mira la lista de
+    ficheros publicada en la rama cliente-actualizaciones y se baja lo que haya
+    cambiado. Usa nuestro modules/updater/updater.lua (client/actualizador/),
+    no el de OTClient. Ver "Actualizaciones automáticas" en client/README.md.
 
 Si la versión de OTClient cambia y el texto que buscamos ya no está, el script
 falla en vez de dejar un cliente a medio configurar.
@@ -44,6 +48,9 @@ HECHIZOS_CLIENTE = REPO / "client" / "hechizos"
 # Datos públicos de cada instancia (ver infra/canary/instancia.env.example).
 SERVIDOR_IP = "158.220.91.85"
 PROTOCOLO = 1525  # La imagen de Canary que usamos acepta 15.25 (ver "Allowed client protocols" en su log)
+
+# Rama donde el workflow publica los ficheros del cliente para el actualizador.
+ACTUALIZACIONES = "https://raw.githubusercontent.com/nocthold-serv/nocthold/cliente-actualizaciones"
 
 CANALES = {
     "prod": {"nombre": "Nocthold", "corto": "nocthold", "puerto_http": 8088},
@@ -100,6 +107,13 @@ def quitar_referencias_bot(carpeta: Path) -> None:
     perfiles.write_text(
         texto.replace(original, "  if modules.game_bot then modules.game_bot.refresh() end\n"), encoding="utf-8"
     )
+
+
+def poner_actualizador(carpeta: Path) -> None:
+    destino = carpeta / "modules" / "updater" / "updater.lua"
+    if not destino.exists():
+        sys.exit("ERROR: no encuentro modules/updater/updater.lua; ¿ha cambiado OTClient?")
+    shutil.copyfile(REPO / "client" / "actualizador" / "updater.lua", destino)
 
 
 # ------------------------------------------------------------------ hechizos
@@ -315,7 +329,16 @@ def main() -> None:
         texto, r'g_app\.setOrganizationName\("[^"]*"\)', 'g_app.setOrganizationName("nocthold")', "setOrganizationName"
     )
 
+    lista = f"{ACTUALIZACIONES}/{canal['corto']}/lista.json"
+    texto = sustituir(
+        texto,
+        r'    --updater = "[^"]*",[^\n]*\n',
+        f'    updater = "{lista}", -- Nocthold: ./updater (client/actualizador)\n',
+        "Services.updater",
+    )
+
     init.write_text(texto, encoding="utf-8")
+    poner_actualizador(carpeta)
     parchear_entergame(carpeta)
     bot = carpeta / "mods" / "game_bot"
     if bot.exists():

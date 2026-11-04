@@ -171,5 +171,80 @@ jobs:
             gh release create "$TAG" dist/*.zip \
               --repo "$GITHUB_REPOSITORY" \
               --title "Cliente Nocthold ${TAG#cliente-}" \
-              --notes "Descarga **Nocthold-Windows.zip**, descomprímelo (no lo abras desde dentro del .zip) y abre **Nocthold.exe**. La primera vez descarga los gráficos del juego (unos minutos). Después entra con tu correo y contraseña. **Nocthold-Pruebas-Windows.zip** es solo para testers."
+              --notes "Descarga **Nocthold-Windows.zip**, descomprímelo (no lo abras desde dentro del .zip) y abre **Nocthold.exe**. La primera vez descarga los gráficos del juego (unos minutos). Después entra con tu correo y contraseña. A partir de aquí el cliente se actualiza solo al abrirlo. **Nocthold-Pruebas-Windows.zip** es solo para testers."
           fi
+
+  # Actualizaciones automáticas (ver client/README.md): copia los ficheros del
+  # cliente (sin el .exe) a la rama cliente-actualizaciones, con la lista que
+  # lee el actualizador al arrancar. Una etiqueta cliente-v* publica los dos
+  # canales; un push a develop, solo el de pruebas.
+  actualizaciones:
+    name: Publicar actualización automática
+    if: github.event_name == 'push'
+    needs: compilar
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: cliente-actualizaciones
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: nocthold
+          sparse-checkout: client
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: cliente-windows
+          path: dist
+
+      - name: Copiar los ficheros y la lista a la rama cliente-actualizaciones
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" == refs/tags/cliente-v* ]]; then
+            version="$GITHUB_REF_NAME"
+            canales="Nocthold Nocthold-Pruebas"
+          else
+            version="develop-${GITHUB_SHA::7}"
+            canales="Nocthold-Pruebas"
+          fi
+
+          rama=cliente-actualizaciones
+          remoto="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git ls-remote --exit-code --heads "$remoto" "$rama" >/dev/null; then
+            git clone --quiet --depth 1 --branch "$rama" "$remoto" rama
+          else
+            git init --quiet -b "$rama" rama
+            git -C rama remote add origin "$remoto"
+            printf '* -text\n' > rama/.gitattributes
+            printf 'Ficheros del cliente para el actualizador automático (los publica el workflow Cliente Windows). No tocar a mano.\n' > rama/README.md
+          fi
+          git -C rama config user.name "github-actions[bot]"
+          git -C rama config user.email "41898295+github-actions[bot]@users.noreply.github.com"
+
+          for nombre in $canales; do
+            corto=$(echo "$nombre" | tr '[:upper:]' '[:lower:]')
+            unzip -q "dist/$nombre-Windows.zip" -d paquetes
+            rm -rf "rama/$corto/ficheros"
+            mkdir -p "rama/$corto/ficheros"
+            for cosa in init.lua otclientrc.lua data modules mods; do
+              if [ -e "paquetes/$nombre/$cosa" ]; then cp -r "paquetes/$nombre/$cosa" "rama/$corto/ficheros/"; fi
+            done
+          done
+          git -C rama add -A
+          git -C rama diff --cached --quiet || git -C rama commit --quiet -m "Ficheros del cliente $version"
+          # La lista apunta a este commit exacto: así nunca mezcla ficheros de dos versiones.
+          sha=$(git -C rama rev-parse HEAD)
+          for nombre in $canales; do
+            corto=$(echo "$nombre" | tr '[:upper:]' '[:lower:]')
+            python3 nocthold/client/manifiesto.py "paquetes/$nombre" \
+              "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/$sha/$corto/ficheros/" \
+              "$version" "rama/$corto/lista.json"
+          done
+          git -C rama add -A
+          git -C rama diff --cached --quiet || git -C rama commit --quiet -m "Lista del cliente $version"
+          git -C rama push --quiet origin "HEAD:$rama"
+          echo "Publicada la actualización $version para: $canales"
