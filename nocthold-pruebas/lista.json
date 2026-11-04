@@ -2822,6 +2822,6 @@
   "/modules/updater/updater.otui": "ef702668",
   "/otclientrc.lua": "176c66ea"
  },
- "url": "https://raw.githubusercontent.com/nocthold-serv/nocthold/a3eb0cf55ce3297e53d0ebfec100ee745ebb4bc6/nocthold-pruebas/ficheros/",
- "version": "develop-bd8607c"
+ "url": "https://raw.githubusercontent.com/nocthold-serv/nocthold/c1a35a530e548c668197614107ca48f29fff40d6/nocthold-pruebas/ficheros/",
+ "version": "cliente-v0.1.3"
 }
